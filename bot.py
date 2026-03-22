@@ -18,12 +18,14 @@ BONUS_AMOUNT = 2500
 BONUS_COOLDOWN = 24 
 START_BALANCE = 0
 
+# Пересчитанные цены: 10 звезд = 750,000 Gall
 DONATION_PLANS = {
-    50: {"gall": 100000, "bonus": 0},     
-    100: {"gall": 200000, "bonus": 5},      
-    200: {"gall": 400000, "bonus": 10},      
-    500: {"gall": 1000000, "bonus": 25},     
-    1000: {"gall": 2000000, "bonus": 50}    
+    10: {"gall": 750000, "bonus": 0},
+    50: {"gall": 3750000, "bonus": 0},      # 750,000 * 5
+    100: {"gall": 7500000, "bonus": 5},     # 750,000 * 10 + 5%
+    200: {"gall": 15000000, "bonus": 10},   # 750,000 * 20 + 10%
+    500: {"gall": 37500000, "bonus": 25},   # 750,000 * 50 + 25%
+    1000: {"gall": 75000000, "bonus": 50}   # 750,000 * 100 + 50%
 }
 MAX_STARS_PER_INVOICE = 2500  
 
@@ -83,8 +85,6 @@ CREATE TABLE IF NOT EXISTS donations (
 conn.commit()
 
 class GameStates(StatesGroup):
-    waiting_bet_amount = State()          # общее состояние для ввода суммы? лучше не использовать общее
-    # Разделим состояния для разных игр
     basketball_bet = State()
     darts_bet = State()
     mines_game = State()
@@ -130,6 +130,8 @@ def get_chat_treasury(chat_id: int):
 async def cmd_donate(message: Message):
     """Показать меню донатов"""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"⭐ 10 звёзд - {DONATION_PLANS[10]['gall']:,} Gall".replace(',', ' '), 
+                              callback_data="donate_10")],
         [InlineKeyboardButton(text=f"⭐ 50 звёзд - {DONATION_PLANS[50]['gall']:,} Gall".replace(',', ' '), 
                               callback_data="donate_50")],
         [InlineKeyboardButton(text=f"⭐ 100 звёзд - {DONATION_PLANS[100]['gall']:,} Gall +5%".replace(',', ' '), 
@@ -160,11 +162,12 @@ async def process_donate_callback(callback: CallbackQuery):
             "2. Звёзды списываются с вашего аккаунта\n"
             "3. На игровой счёт начисляются Gall с бонусом\n\n"
             "Бонусы за пакеты:\n"
-            "• 50 ⭐ → 100,000 Gall (без бонуса)\n"
-            "• 100 ⭐ → 200,000 Gall +5% (210,000 Gall)\n"
-            "• 200 ⭐ → 400,000 Gall +10% (440,000 Gall)\n"
-            "• 500 ⭐ → 1,000,000 Gall +25% (1,250,000 Gall)\n"
-            "• 1000 ⭐ → 2,000,000 Gall +50% (3,000,000 Gall)\n\n"
+            "• 10 ⭐ → 750,000 Gall (без бонуса)\n"
+            "• 50 ⭐ → 3,750,000 Gall (без бонуса)\n"
+            "• 100 ⭐ → 7,500,000 Gall +5% (7,875,000 Gall)\n"
+            "• 200 ⭐ → 15,000,000 Gall +10% (16,500,000 Gall)\n"
+            "• 500 ⭐ → 37,500,000 Gall +25% (46,875,000 Gall)\n"
+            "• 1000 ⭐ → 75,000,000 Gall +50% (112,500,000 Gall)\n\n"
             "После оплаты средства зачисляются автоматически!"
         )
         await callback.answer()
@@ -315,7 +318,7 @@ async def cmd_start(message: Message):
         "/roulette - Рулетка"
     )
 
-@dp.message(F.text.lower().in_(['б', '/balance']))
+@dp.message(F.text.lower().in_(['б', '/balance', 'баланс']))
 async def cmd_balance(message: Message):
     user = get_user(message.from_user.id)
     balance = user[2]
@@ -338,11 +341,12 @@ async def cmd_bonus(message: Message):
         next_bonus_time = last_bonus_time + timedelta(hours=BONUS_COOLDOWN)
         if datetime.now() < next_bonus_time:
             remaining = next_bonus_time - datetime.now()
-            hours, remainder = divmod(remaining.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
+            hours = remaining.seconds // 3600
+            minutes = (remaining.seconds % 3600) // 60
             await message.reply(f"⏳ Бонус будет доступен через {hours}ч {minutes}м")
             return
     
+    # Обновляем баланс и время последнего бонуса
     cursor.execute('UPDATE users SET balance = balance + ?, last_bonus = ? WHERE user_id = ?',
                    (BONUS_AMOUNT, datetime.now().isoformat(), user_id))
     conn.commit()
@@ -454,7 +458,7 @@ async def cmd_set_reward(message: Message):
 
 # ==================== Баскетбол ====================
 @dp.message(Command('basketball'))
-async def cmd_basketball(message: Message):
+async def cmd_basketball(message: Message, state: FSMContext):
     user_id = message.from_user.id
     balance = get_balance(user_id)
     
@@ -482,7 +486,7 @@ async def process_basketball_bet(callback: CallbackQuery, state: FSMContext):
             "Или отправьте 0 для отмены"
         )
     except Exception:
-        pass  # сообщение могло быть удалено
+        pass
     await callback.answer()
 
 @dp.message(GameStates.basketball_bet)
@@ -551,7 +555,7 @@ async def process_basketball_amount(message: Message, state: FSMContext):
 
 # ==================== Дартс ====================
 @dp.message(Command('darts'))
-async def cmd_darts(message: Message):
+async def cmd_darts(message: Message, state: FSMContext):
     user_id = message.from_user.id
     balance = get_balance(user_id)
     
@@ -657,7 +661,7 @@ async def process_darts_amount(message: Message, state: FSMContext):
 
 # ==================== Мины ====================
 @dp.message(Command('mines'))
-async def cmd_mines(message: Message):
+async def cmd_mines(message: Message, state: FSMContext):
     user_id = message.from_user.id
     balance = get_balance(user_id)
     
@@ -840,7 +844,7 @@ async def process_mines_click(callback: CallbackQuery, state: FSMContext):
 
 # ==================== Рулетка ====================
 @dp.message(Command('roulette'))
-async def cmd_roulette(message: Message):
+async def cmd_roulette(message: Message, state: FSMContext):
     user_id = message.from_user.id
     balance = get_balance(user_id)
     
