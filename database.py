@@ -63,9 +63,8 @@ def get_user(user_id):
 def create_user(user_id, username):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    now = datetime.datetime.now().isoformat()
     c.execute("INSERT INTO users (user_id, username, balance, last_bonus) VALUES (?, ?, ?, ?)",
-              (user_id, username, 0, now))
+              (user_id, username, 0, None))  # важно: last_bonus = None
     conn.commit()
     conn.close()
 
