@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import datetime
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.types import ChatMemberStatus
+from aiogram.enums import ChatMemberStatus
 
 from config import *
 import database as db
