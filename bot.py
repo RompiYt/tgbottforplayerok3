@@ -13,7 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import logging
 
 
-API_TOKEN = '8685749642:AAEV_g48v9b8wWBPycQPii3Mq9lvh-2UxKA'  
+API_TOKEN = '48v9b8wWBPycQPii3Mq9lvh-2UxKA'  
 BONUS_AMOUNT = 2500
 BONUS_COOLDOWN = 24 
 START_BALANCE = 0
