@@ -306,7 +306,7 @@ async def cmd_start(message: Message):
         "Доступные команды:\n"
         "/balance или б - проверить баланс\n"
         "/bonus или бонус - получить ежедневный бонус\n"
-        "/top или топ - топ игроков чата\n"
+        "/top - топ игроков чата\n"
         "/treasury или казна - информация о казне чата\n"
         "/donate - пополнить баланс звёздами Telegram\n"
         "/mydonations - история донатов\n"
@@ -318,8 +318,9 @@ async def cmd_start(message: Message):
         "/roulette - Рулетка"
     )
 
-@dp.message(F.text.lower().in_(['б', '/balance', 'баланс']))
-async def cmd_balance(message: Message):
+# ==================== Баланс ====================
+@dp.message(Command('balance'))
+async def cmd_balance_slash(message: Message):
     user = get_user(message.from_user.id)
     balance = user[2]
     total_donated = user[4]  
@@ -330,7 +331,21 @@ async def cmd_balance(message: Message):
     
     await message.reply(text)
 
+@dp.message(F.text.lower().in_(['б', 'баланс', 'balance']))
+async def cmd_balance_text(message: Message):
+    user = get_user(message.from_user.id)
+    balance = user[2]
+    total_donated = user[4]  
+    
+    text = f"💰 Ваш баланс: {balance} Gall"
+    if total_donated > 0:
+        text += f"\n⭐ Всего задоначено: {total_donated} звёзд"
+    
+    await message.reply(text)
+
+# ==================== Бонус ====================
 @dp.message(Command(commands=['bonus', 'бонус']))
+@dp.message(F.text.lower() == 'бонус')
 async def cmd_bonus(message: Message):
     user_id = message.from_user.id
     user = get_user(user_id)
@@ -353,7 +368,8 @@ async def cmd_bonus(message: Message):
     
     await message.reply(f"🎁 Вы получили бонус {BONUS_AMOUNT} Gall!")
 
-@dp.message(F.text.lower().in_(['топ', '/top']))
+# ==================== Топ ====================
+@dp.message(Command('top'))
 async def cmd_top(message: Message):
     chat_id = message.chat.id
     cursor.execute('''
