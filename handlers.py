@@ -51,7 +51,7 @@ async def bonus_button(message: Message):
         minutes = remainder // 60
         await message.answer(f"🎁 Бонус уже получен! Следующий через {hours} ч {minutes} мин.")
     else:
-        db.update_balance(user_id, 10000, "Ежедневный бонус")
+        db.update_balance(user_id, 2500, "Ежедневный бонус")
         db.set_last_bonus(user_id)
         await message.answer(
             "🎁 Ежедневная награда получена!\n━━━━━━━━━━━━━━━━━━━━\n"
