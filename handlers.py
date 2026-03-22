@@ -172,8 +172,8 @@ async def help_command(message: Message):
     text = (
         "💎 Полный список команд GALL\n\n"
         "💳 Твой кошелек:\n"
-        "├ Баланс — чекнуть счёт\n"
-        "├ Профиль — всё о твоём статусе\n"
+        "├ Бонус — получить бонус\n"
+        "├ Профиль — всё о твоём статусе,наличии валюты\n"
         "└ /history — логи твоих побед и трат\n\n"
         "💸 Переводы и бонусы:\n"
         "├ п [сумма] — скинуть кэш (ответом)\n"
@@ -217,19 +217,16 @@ async def history_command(message: Message):
 # /top
 @router.message(Command("top"))
 async def top_command(message: Message):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT username, balance FROM users ORDER BY balance DESC LIMIT 10")
-    rows = c.fetchall()
-    conn.close()
-    if not rows:
-        await message.answer("Нет пользователей.")
+    top_users = db.get_top_users(10)  # возвращает список (username, balance)
+    if not top_users:
+        await message.answer("Нет пользователей в рейтинге.")
         return
     text = "🏆 Топ-10 игроков по балансу:\n\n"
-    for i, (username, balance) in enumerate(rows, 1):
-        text += f"{i}. {username or 'Аноним'} — {balance} GALL\n"
+    for i, (username, balance) in enumerate(top_users, 1):
+        name = username if username else "Аноним"
+        text += f"{i}. {name} — {balance} GALL\n"
     await message.answer(text)
-
+    
 # Перевод: п [сумма] (ответом) или п [ID] [сумма]
 @router.message(Command("п"))
 async def transfer_command(message: Message):
