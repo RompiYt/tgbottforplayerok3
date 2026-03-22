@@ -116,3 +116,84 @@ async def cat_static(callback: CallbackQuery):
     await callback.message.edit_text("🎲 Статические игры:\nИспытай удачу в один клик.\nВыберите игру:", reply_markup=kb.static_games_menu)
     await callback.answer()
 
+@router.message(F.text == "Донат")
+async def donate_button(message: Message):
+    text = (
+        "⭐ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Вы можете мгновенно приобрести валюту через Telegram Stars.\n"
+        "Это самый быстрый и безопасный способ стать богаче в игре!\n\n"
+        "💎 Что дают GALL?\n"
+        "├ Возможность играть по крупным ставкам\n"
+        "├ Создание собственных чеков для друзей\n"
+        "└ Попадание в глобальный топ игроков\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "⬇️ Нажмите кнопку ниже, чтобы перейти к покупке:"
+    )
+    buy_button = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Купить GALL", callback_data="show_donation_plans")]
+    ])
+    await message.answer(text, reply_markup=buy_button)
+
+@router.callback_query(F.data == "show_donation_plans")
+async def show_donation_plans(callback: CallbackQuery):
+    text = "💎 Выберите сумму пополнения:\n\n"
+    for stars, info in DONATION_PLANS.items():
+        text += f"⭐ {stars} Stars → +{info['gall']} GALL"
+        if info['bonus']:
+            text += f" (+{info['bonus']}% бонус)"
+        text += "\n"
+    await callback.message.edit_text(text)
+    await callback.answer()
+
+# Обработчик для кнопки "Пойти играть" после бонуса
+@router.callback_query(F.data == "go_play")
+async def go_play(callback: CallbackQuery):
+    await callback.message.answer(
+        "🎰 Игровой зал GALL\n━━━━━━━━━━━━━━━━━━━━\n"
+        "Добро пожаловать в элитный клуб! Выбирай свой стиль игры и начинай побеждать.\n\n"
+        "👇 Выбери категорию:",
+        reply_markup=kb.games_category_menu
+    )
+    await callback.answer()
+
+# Кнопка "Назад" из игровых меню
+@router.callback_query(F.data == "back_to_games")
+async def back_to_games(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "🎰 Игровой зал GALL\n━━━━━━━━━━━━━━━━━━━━\n"
+        "Добро пожаловать в элитный клуб! Выбирай свой стиль игры и начинай побеждать.\n\n"
+        "👇 Выбери категорию:",
+        reply_markup=kb.games_category_menu
+    )
+    await callback.answer()
+
+# Заглушки для всех игр
+@router.callback_query(F.data == "game_slot")
+async def game_slot(callback: CallbackQuery):
+    await callback.answer("Слот-машина в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_dice")
+async def game_dice(callback: CallbackQuery):
+    await callback.answer("Кости в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_darts")
+async def game_darts(callback: CallbackQuery):
+    await callback.answer("Дартс в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_basket")
+async def game_basket(callback: CallbackQuery):
+    await callback.answer("Баскетбол в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_football")
+async def game_football(callback: CallbackQuery):
+    await callback.answer("Футбол в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_roulette")
+async def game_roulette(callback: CallbackQuery):
+    await callback.answer("Рулетка в разработке!", show_alert=True)
+
+@router.callback_query(F.data == "game_mines")
+async def game_mines(callback: CallbackQuery):
+    await callback.answer("Мины в разработке!", show_alert=True)
+
+
