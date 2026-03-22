@@ -56,7 +56,7 @@ async def bonus_button(message: Message):
         db.set_last_bonus(user_id)
         await message.answer(
             "🎁 Ежедневная награда получена!\n━━━━━━━━━━━━━━━━━━━━\n"
-            "Вы получили: +10 000 GALL\n\n"
+            "Вы получили: +2500 GALL\n\n"
             "Следующий бонус будет доступен ровно через 12 часов.\n━━━━━━━━━━━━━━━━━━━━",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Пойти играть", callback_data="go_play")]
