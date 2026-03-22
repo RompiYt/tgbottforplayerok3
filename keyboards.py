@@ -12,9 +12,9 @@ main_menu = ReplyKeyboardMarkup(
 
 # Клавиатура выбора категории игр
 games_category_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Динамический", callback_data="cat_dynamic")],
-    [InlineKeyboardButton(text="Статический", callback_data="cat_static")],
-    [InlineKeyboardButton(text="Перейти в чат", url=CHAT_LINK)]
+    [InlineKeyboardButton(text="⚡️Динамический", callback_data="cat_dynamic")],
+    [InlineKeyboardButton(text="🎯Статический", callback_data="cat_static")],
+    [InlineKeyboardButton(text="🎮Перейти в чат", url=CHAT_LINK)]
 ])
 
 # Клавиатура для статических игр
