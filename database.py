@@ -204,7 +204,7 @@ def get_top_users(limit=10):
     rows = c.fetchall()
     conn.close()
     return rows
-
+    
 # --- Функции для истории ---
 def get_user_history(user_id, limit=10):
     conn = sqlite3.connect(DB_PATH)
