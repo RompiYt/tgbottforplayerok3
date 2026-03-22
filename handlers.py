@@ -82,20 +82,19 @@ async def commands_button(message: Message):
     await message.answer(
         "💎 Полный список команд HARD\n\n"
         "💳 Твой кошелек:\n"
-        "├ баланс (или б) — чекнуть счёт\n"
-        "├ /профиль — всё о твоём статусе\n"
+        "├ Баланс — чекнуть счёт\n"
+        "├ Профиль — всё о твоём статусе\n"
         "└ /history — логи твоих побед и трат\n\n"
         "💸 Переводы и бонусы:\n"
-        "├ п [сумма] — скинуть кэш (ответом)\n"
-        "├ п [ID] [сумма] — перевод по ID\n"
-        "├ чеки — создать чек на валюту\n"
-        "├ промо [код] — забрать халяву\n"
+        "├ /п [сумма] — скинуть кэш (ответом)\n"
+        "├ /п [ID] [сумма] — перевод по ID\n"
+        "├ /промо [код] — забрать халяву\n"
         "└ /top — заглянуть в список Forbes\n\n"
         "🚀 Для владельцев групп:\n"
         "├ /games — ⚙️ настройка игр (вкл/выкл)\n"
-        "├ казна [сумма] — пополнить общий фонд\n"
-        "├ казна — проверить баланс фонда группы\n"
-        "└ награда [сумма] — выдать бонус из казны"
+        "├ /казна [сумма] — пополнить общий фонд\n"
+        "├ /казна — проверить баланс фонда группы\n"
+        "└ /награда [сумма] — выдать бонус из казны"
     )
 
 @router.message(F.text == "Игры")
@@ -384,17 +383,12 @@ async def give_reward(message: Message):
     except ValueError:
         await message.answer("Неверная сумма.")
 
-# /deposit [сумма] (пополнение казны из личного баланса)
 @router.message(Command("deposit"))
 async def deposit_treasury(message: Message):
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
-    # Проверка прав админа
-    member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
-    if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
-        await message.answer("Только администраторы могут пополнять казну.")
-        return
+    # Убираем проверку на админа — любой может пополнить
     args = message.text.split()
     if len(args) != 2:
         await message.answer("Использование: /deposit [сумма]")
@@ -412,7 +406,8 @@ async def deposit_treasury(message: Message):
         db.update_balance(message.from_user.id, -amount, f"Пополнение казны группы {message.chat.id}")
         # Добавляем в казну
         db.add_to_treasury(message.chat.id, amount)
-        await message.answer(f"✅ Казна пополнена на {amount} GALL. Новый баланс казны: {db.get_group_treasury(message.chat.id)['balance']} GALL.")
+        new_balance = db.get_group_treasury(message.chat.id)['balance']
+        await message.answer(f"✅ Казна пополнена на {amount} GALL. Новый баланс казны: {new_balance} GALL.")
     except ValueError:
         await message.answer("Неверная сумма.")
 
