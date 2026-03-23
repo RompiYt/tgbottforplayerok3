@@ -114,14 +114,8 @@ async def cat_dynamic(callback: CallbackQuery):
         "🎡 Рулетка\n"
         "Ставка: [сумма] [тип]\n"
         "Команды: го, отмена, повторить, удвоить, лог\n\n"
-        "🛣️ Дорога\n"
-        "Команда: дорога [сумма]\n\n"
         "💣 Мины (Mines)\n"
         "Команда: мин [ставка] [бомбы]\n\n"
-        "🎴 Хило (Hi-Lo)\n"
-        "Команда: хило [ставка]\n\n"
-        "🤡 Джокер (Joker)\n"
-        "Команда: дж [ставка]"
     )
     await callback.message.edit_text(text, reply_markup=kb.dynamic_games_menu)
     await callback.answer()
