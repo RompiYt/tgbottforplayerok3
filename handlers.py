@@ -48,7 +48,7 @@ async def chats_button(message: Message):
         ])
     )
 
-@router.message(F.text == "Бонус")
+@router.message(F.text == "бонус")
 async def bonus_button(message: Message):
     user_id = message.from_user.id
     last = db.get_last_bonus(user_id)
@@ -70,7 +70,7 @@ async def bonus_button(message: Message):
             ])
         )
 
-@router.message(F.text == "Профиль")
+@router.message(F.text == "профиль")
 async def profile_button(message: Message):
     user = db.get_user(message.from_user.id)
     if user:
@@ -84,7 +84,7 @@ async def profile_button(message: Message):
     else:
         await message.answer("Профиль не найден. Напишите /start.")
 
-@router.message(F.text == "Команды")
+@router.message(F.text == "команды")
 async def commands_button(message: Message):
     await message.answer(
         "💎 Полный список команд HARD\n\n"
@@ -104,7 +104,7 @@ async def commands_button(message: Message):
         "└ /награда [сумма] — выдать бонус из казны"
     )
 
-@router.message(F.text == "Игры")
+@router.message(F.text == "игры")
 async def games_button(message: Message):
     await message.answer(
         "🎰 Игровой зал GALL\n━━━━━━━━━━━━━━━━━━━━\n"
