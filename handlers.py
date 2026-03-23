@@ -662,7 +662,7 @@ async def football_modes(message: Message):
         f"⚽ Выпало: {value}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
-    )
+    
 
 @router.callback_query(F.data == "game_roulette")
 async def game_roulette(callback: CallbackQuery):
