@@ -155,7 +155,7 @@ async def cat_static(callback: CallbackQuery):
     ]))
     await callback.answer()
 
-@router.message(F.text == "Донат")
+@router.message(F.text == "донат")
 async def donate_button(message: Message):
     text = (
         "⭐ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -472,23 +472,26 @@ async def set_reward_command(message: Message):
         await message.answer("Неверная сумма.")
 
 
-@router.message(F.text.startswith("кубы"))
+@router.message(F.text.startswith("кубик"))
 async def dice_modes(message: Message):
+
     args = message.text.lower().split()
 
+    # 👉 подсказка
     if len(args) == 1:
         return await message.answer(
             "🎲 Кубы\n\n"
             "Режимы:\n"
             "• чет / нечет (x2)\n"
-            "• больше N (x1.5)\n"
-            "• меньше N (x1.7)\n"
+            "• больше N\n"
+            "• меньше N\n"
             "• числа (x5.5)\n\n"
-            "Пример: кубы 1000 чет"
+            "Пример:\n"
+            "кубы 1000 больше 3"
         )
 
     if len(args) < 3:
-        return await message.answer("🎲 кубы [ставка] [режим]")
+        return await message.answer("🎲 кубик [ставка] [режим]")
 
     bet = int(args[1])
     user_id = message.from_user.id
@@ -496,19 +499,30 @@ async def dice_modes(message: Message):
     if db.get_balance(user_id) < bet:
         return await message.answer("❌ Недостаточно средств")
 
-    db.update_balance(user_id, -bet, "Кубы")
+    mode = args[2:]
+
+    # 🚫 ограничения
+    if mode[0] == "больше":
+        num = int(mode[1])
+        if num <= 0 or num >= 6:
+            return await message.answer("❌ Можно писать больше только от 1 до 5")
+
+    if mode[0] == "меньше":
+        num = int(mode[1])
+        if num <= 1 or num >= 7:
+            return await message.answer("❌ Можно писать меньше только от 2 до 6")
+
+    db.update_balance(user_id, -bet, "Кубик")
 
     msg = await message.answer_dice(emoji="🎲")
     value = msg.dice.value
 
-    await asyncio.sleep(2)
-
-    # красивое описание
-    result_text = f"🎲 Выпало: {value}"
+    await asyncio.sleep(4)
 
     win = 0
-    mode = args[2:]
+    result_text = f"🎲 Выпало: {value}"
 
+    # 🎯 ЧЕТ / НЕЧЕТ
     if mode[0] == "чет":
         result_text = "🔢 ЧЕТНОЕ" if value % 2 == 0 else "🔢 НЕЧЕТНОЕ"
         if value % 2 == 0:
@@ -519,18 +533,47 @@ async def dice_modes(message: Message):
         if value % 2 == 1:
             win = bet * 2
 
+    # 📈 БОЛЬШЕ
     elif mode[0] == "больше":
         num = int(mode[1])
-        result_text = f"📈 БОЛЬШЕ {num}" if value > num else f"📉 МЕНЬШЕ/РАВНО {num}"
-        if value > num:
-            win = int(bet * 1.5)
 
+        # особый x3
+        if num == 5 and value == 6:
+            win = bet * 3
+
+        elif value > num:
+            if num == 1:
+                win = int(bet * 1.2)
+            elif num == 2:
+                win = int(bet * 1.4)
+            elif num == 3:
+                win = int(bet * 1.5)
+            elif num == 4:
+                win = int(bet * 1.3)
+            elif num == 5:
+                win = int(bet * 1.2)
+
+    # 📉 МЕНЬШЕ
     elif mode[0] == "меньше":
         num = int(mode[1])
-        result_text = f"📉 МЕНЬШЕ {num}" if value < num else f"📈 БОЛЬШЕ/РАВНО {num}"
-        if value < num:
-            win = int(bet * 1.7)
 
+        # особый x3
+        if num == 2 and value == 1:
+            win = bet * 3
+
+        elif value < num:
+            if num == 6:
+                win = int(bet * 1.2)
+            elif num == 5:
+                win = int(bet * 1.4)
+            elif num == 4:
+                win = int(bet * 1.5)
+            elif num == 3:
+                win = int(bet * 1.3)
+            elif num == 2:
+                win = int(bet * 1.2)
+
+    # 🎯 ЧИСЛА
     else:
         numbers = list(map(int, mode))
         result_text = f"🎯 ЧИСЛО {value}"
@@ -539,7 +582,7 @@ async def dice_modes(message: Message):
             win = int(bet * coef)
 
     if win:
-        db.update_balance(user_id, win, "Кубы выигрыш")
+        db.update_balance(user_id, win, "Кубик выигрыш")
 
     await message.answer(
         f"{result_text}\n"
@@ -548,57 +591,59 @@ async def dice_modes(message: Message):
 
 @router.message(F.text.startswith("дартс"))
 async def darts_modes(message: Message):
-    import asyncio
 
     args = message.text.lower().split()
 
-    # 👉 если просто "дартс"
+    # 👉 подсказка
     if len(args) == 1:
         return await message.answer(
             "🎯 Дартс\n\n"
             "Режимы:\n"
             "• центр\n"
             "• мимо\n"
-            "• кр (красное)\n"
-            "• бел\n\n"
-            "Все режимы x2\n\n"
+            "• кр\n"
+            "• бел\n"
+            "• обычный\n\n"
             "Пример:\n"
+            "дартс 1000\n"
             "дартс 1000 центр"
         )
 
-    if len(args) < 3:
-        return await message.answer("🎯 дартс [ставка] [режим]")
-
     bet = int(args[1])
-    mode = args[2]
+    mode = args[2] if len(args) > 2 else "обычный"
     user_id = message.from_user.id
 
     if db.get_balance(user_id) < bet:
         return await message.answer("❌ Недостаточно средств")
 
-    # списываем
     db.update_balance(user_id, -bet, "Дартс")
 
-    # 🎯 бросок
     msg = await message.answer_dice(emoji="🎯")
     value = msg.dice.value
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(4)
 
     win = 0
 
-    # определяем результат
+    # результат
     if value == 6:
         result = "🎯 ЦЕНТР"
     elif value >= 4:
-        result = "🔴 КРАСНОЕ"
+        result = "🟡 РЯДОМ"
     elif value == 3:
-        result = "⚪ БЕЛОЕ"
+        result = "⚪ ДАЛЕКО"
     else:
         result = "❌ МИМО"
 
-    # 🎯 ЛОГИКА
-    if mode == "центр" and value == 6:
+    # 🎯 ОБЫЧНЫЙ РЕЖИМ
+    if mode == "обычный":
+        if value == 6:
+            win = bet * 3
+        elif value >= 4:
+            win = bet * 2
+
+    # 🎯 СТАРЫЕ РЕЖИМЫ
+    elif mode == "центр" and value == 6:
         win = bet * 2
 
     elif mode == "мимо" and value <= 2:
@@ -621,7 +666,6 @@ async def darts_modes(message: Message):
 
 @router.message(F.text.startswith("баскет"))
 async def basket_modes(message: Message):
-    import asyncio
 
     args = message.text.lower().split()
 
@@ -656,7 +700,7 @@ async def basket_modes(message: Message):
     msg = await message.answer_dice(emoji="🏀")
     value = msg.dice.value
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(4)
 
     win = 0
 
@@ -727,7 +771,7 @@ async def football_modes(message: Message):
     msg = await message.answer_dice(emoji="⚽")
     value = msg.dice.value
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(4)
 
     win = 0
 
