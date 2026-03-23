@@ -109,37 +109,39 @@ async def games_button(message: Message):
 @router.callback_query(F.data == "cat_dynamic")
 async def cat_dynamic(callback: CallbackQuery):
     text = (
-        "🎲 ДИНАМИЧЕСКИЕ ИГРЫ\n"
+        "🎲 ДИНАМИЧЕСКИЕ ИГРЫ\n\n"
         "Здесь важен каждый ход. Просчитывай риски и забирай куш!\n\n"
-        "🎡 Рулетка\n"
-        "Ставка: [сумма] [тип]\n"
-        "Команды: го, отмена, повторить, удвоить, лог\n\n"
-        "💣 Мины (Mines)\n"
-        "Команда: мин [ставка] [бомбы]\n\n"
+        "🔴 Рулетка\n"
+        "L Ставка: [сумма] [тип]\n"
+        "L Команды: го, отмена, повторить, удвоить, лог\n\n"
+        "⚫ Мины (Mines)\n"
+        "L Команда: мин [ставка] [бомбы]\n\n"
     )
-    await callback.message.edit_text(text, reply_markup=kb.dynamic_games_menu)
+    await callback.message.edit_text(text)
     await callback.answer()
 
 @router.callback_query(F.data == "cat_static")
 async def cat_static(callback: CallbackQuery):
     text = (
-        "🎲 СТАТИЧЕСКИЕ ИГРЫ\n"
-        "Испытай удачу в один клик. Моментальный результат!\n\n"
-        "🎰 Слот-машина\n"
-        "Команда: спин [ставка]\n\n"
-        "🎲 Кости (Dice)\n"
-        "Команда: кубик [ставка]\n\n"
-        "🎯 Дартс\n"
-        "Команда: дартс [ставка]\n\n"
-        "🏀 Баскетбол\n"
-        "Команда: баскет [ставка]\n\n"
-        "⚽ Футбол\n"
-        "Команда: футбол [ставка] [режим]"
+        "💎 СТАТИЧЕСКИЕ ИГРЫ\n\n"
+        "Испытай удачу в один клик. Моментальный результат! 💎\n\n"
+        "🔴 Слот-машина\n"
+        "L Команда: спин [ставка]\n\n"
+        "🟢 Кости (Dice)\n"
+        "L Команда: кубик [ставка]\n\n"
+        "🟣 Дартс\n"
+        "L Команда: дартс [ставка]\n\n"
+        "🟤 Баскетбол\n"
+        "L Команда: баскет [ставка]\n\n"
+        "🟥 Футбол\n"
+        "L Команда: футбол [ставка] [режим]\n\n"
+        "---\n\n"
+        "Назад в меню"
     )
-    await callback.message.edit_text(text, reply_markup=kb.static_games_menu)
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_games")]
+    ]))
     await callback.answer()
-
-
 
 @router.message(F.text == "Донат")
 async def donate_button(message: Message):
