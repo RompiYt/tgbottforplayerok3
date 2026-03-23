@@ -35,7 +35,7 @@ async def balance_short(message: Message):
     balance = db.get_balance(message.from_user.id)
     await message.answer(f"💰 Ваш баланс: {balance} GALL")
     
-@router.message(F.text == "Чаты")
+@router.message(F.text == "чаты")
 async def chats_button(message: Message):
     await message.answer(
         "🔗 Наши официальные ресурсы\n━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -89,8 +89,8 @@ async def commands_button(message: Message):
     await message.answer(
         "💎 Полный список команд HARD\n\n"
         "💳 Твой кошелек:\n"
-        "├ Баланс — чекнуть счёт\n"
-        "├ Профиль — всё о твоём статусе\n"
+        "├ б — чекнуть счёт\n"
+        "├ профиль — всё о твоём статусе\n"
         "└ /history — логи твоих побед и трат\n\n"
         "💸 Переводы и бонусы:\n"
         "├ /п [сумма] — скинуть кэш (ответом)\n"
