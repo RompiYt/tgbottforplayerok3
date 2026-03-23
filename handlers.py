@@ -30,6 +30,11 @@ async def cmd_start(message: Message):
         reply_markup=kb.main_menu
     )
 
+@router.message(F.text.lower() == "б")
+async def balance_short(message: Message):
+    balance = db.get_balance(message.from_user.id)
+    await message.answer(f"💰 Ваш баланс: {balance} GALL")
+    
 @router.message(F.text == "Чаты")
 async def chats_button(message: Message):
     await message.answer(
@@ -467,12 +472,23 @@ async def set_reward_command(message: Message):
         await message.answer("Неверная сумма.")
 
 
-@router.message(F.text.startswith("кубик"))
+@router.message(F.text.startswith("кубы"))
 async def dice_modes(message: Message):
     args = message.text.lower().split()
 
+    if len(args) == 1:
+        return await message.answer(
+            "🎲 Кубы\n\n"
+            "Режимы:\n"
+            "• чет / нечет (x2)\n"
+            "• больше N (x1.5)\n"
+            "• меньше N (x1.7)\n"
+            "• числа (x5.5)\n\n"
+            "Пример: кубы 1000 чет"
+        )
+
     if len(args) < 3:
-        return await message.answer("🎲 Пример: кубик 1000 чет")
+        return await message.answer("🎲 кубы [ставка] [режим]")
 
     bet = int(args[1])
     user_id = message.from_user.id
@@ -480,57 +496,75 @@ async def dice_modes(message: Message):
     if db.get_balance(user_id) < bet:
         return await message.answer("❌ Недостаточно средств")
 
-    db.update_balance(user_id, -bet, "Кубик")
+    db.update_balance(user_id, -bet, "Кубы")
 
     msg = await message.answer_dice(emoji="🎲")
     value = msg.dice.value
 
     await asyncio.sleep(2)
-    
-    mode = args[2:]
-    win = 0
 
-    # ЧЕТ / НЕЧЕТ
+    # красивое описание
+    result_text = f"🎲 Выпало: {value}"
+
+    win = 0
+    mode = args[2:]
+
     if mode[0] == "чет":
+        result_text = "🔢 ЧЕТНОЕ" if value % 2 == 0 else "🔢 НЕЧЕТНОЕ"
         if value % 2 == 0:
             win = bet * 2
 
     elif mode[0] == "нечет":
+        result_text = "🔢 НЕЧЕТНОЕ" if value % 2 == 1 else "🔢 ЧЕТНОЕ"
         if value % 2 == 1:
             win = bet * 2
 
-    # БОЛЬШЕ / МЕНЬШЕ
-    elif mode[0] == "больше" and len(mode) >= 2:
+    elif mode[0] == "больше":
         num = int(mode[1])
+        result_text = f"📈 БОЛЬШЕ {num}" if value > num else f"📉 МЕНЬШЕ/РАВНО {num}"
         if value > num:
             win = int(bet * 1.5)
 
-    elif mode[0] == "меньше" and len(mode) >= 2:
+    elif mode[0] == "меньше":
         num = int(mode[1])
+        result_text = f"📉 МЕНЬШЕ {num}" if value < num else f"📈 БОЛЬШЕ/РАВНО {num}"
         if value < num:
             win = int(bet * 1.7)
 
-    # ТОЧНЫЕ ЧИСЛА
     else:
-        try:
-            numbers = list(map(int, mode))
-            if value in numbers:
-                coef = 5.5 / len(numbers)
-                win = int(bet * coef)
-        except:
-            pass
+        numbers = list(map(int, mode))
+        result_text = f"🎯 ЧИСЛО {value}"
+        if value in numbers:
+            coef = 5.5 / len(numbers)
+            win = int(bet * coef)
 
     if win:
-        db.update_balance(user_id, win, "Кубик выигрыш")
+        db.update_balance(user_id, win, "Кубы выигрыш")
 
     await message.answer(
-        f"🎲 Выпало: {value}\n"
+        f"{result_text}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("дартс"))
 async def darts_modes(message: Message):
+    import asyncio
+
     args = message.text.lower().split()
+
+    # 👉 если просто "дартс"
+    if len(args) == 1:
+        return await message.answer(
+            "🎯 Дартс\n\n"
+            "Режимы:\n"
+            "• центр\n"
+            "• мимо\n"
+            "• кр (красное)\n"
+            "• бел\n\n"
+            "Все режимы x2\n\n"
+            "Пример:\n"
+            "дартс 1000 центр"
+        )
 
     if len(args) < 3:
         return await message.answer("🎯 дартс [ставка] [режим]")
@@ -542,8 +576,10 @@ async def darts_modes(message: Message):
     if db.get_balance(user_id) < bet:
         return await message.answer("❌ Недостаточно средств")
 
+    # списываем
     db.update_balance(user_id, -bet, "Дартс")
 
+    # 🎯 бросок
     msg = await message.answer_dice(emoji="🎯")
     value = msg.dice.value
 
@@ -551,6 +587,17 @@ async def darts_modes(message: Message):
 
     win = 0
 
+    # определяем результат
+    if value == 6:
+        result = "🎯 ЦЕНТР"
+    elif value >= 4:
+        result = "🔴 КРАСНОЕ"
+    elif value == 3:
+        result = "⚪ БЕЛОЕ"
+    else:
+        result = "❌ МИМО"
+
+    # 🎯 ЛОГИКА
     if mode == "центр" and value == 6:
         win = bet * 2
 
@@ -567,13 +614,30 @@ async def darts_modes(message: Message):
         db.update_balance(user_id, win, "Дартс выигрыш")
 
     await message.answer(
-        f"🎯 Выпало: {value}\n"
+        f"{result}\n"
+        f"💰 Ставка: {bet}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("баскет"))
 async def basket_modes(message: Message):
+    import asyncio
+
     args = message.text.lower().split()
+
+    # 👉 если просто "баскет"
+    if len(args) == 1:
+        return await message.answer(
+            "🏀 Баскет\n\n"
+            "Режимы:\n"
+            "• классика (x2 попадание, x3 чисто)\n"
+            "• гол (x1.9)\n"
+            "• чисто (x3.5)\n"
+            "• мимо (x1.5)\n\n"
+            "Пример:\n"
+            "баскет 1000\n"
+            "баскет 1000 чисто"
+        )
 
     if len(args) < 2:
         return await message.answer("🏀 баскет [ставка] [режим]")
@@ -585,23 +649,35 @@ async def basket_modes(message: Message):
     if db.get_balance(user_id) < bet:
         return await message.answer("❌ Недостаточно средств")
 
+    # списываем ставку
     db.update_balance(user_id, -bet, "Баскет")
 
+    # 🎲 анимация
     msg = await message.answer_dice(emoji="🏀")
     value = msg.dice.value
 
     await asyncio.sleep(2)
-    
+
     win = 0
 
-    # КЛАССИКА
+    # определяем результат
+    if value == 6:
+        result = "💦 ЧИСТО"
+    elif value >= 4:
+        result = "🏀 ПОПАЛ"
+    else:
+        result = "❌ МИМО"
+
+    # 🎯 ЛОГИКА СТАВОК
+
+    # классика
     if mode == "классика":
         if value == 6:
             win = bet * 3
         elif value >= 4:
             win = bet * 2
 
-    # СПЕЦ СТАВКИ
+    # спец
     elif mode == "гол" and value >= 4:
         win = int(bet * 1.9)
 
@@ -615,13 +691,26 @@ async def basket_modes(message: Message):
         db.update_balance(user_id, win, "Баскет выигрыш")
 
     await message.answer(
-        f"🏀 Выпало: {value}\n"
+        f"{result}\n"
+        f"💰 Ставка: {bet}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("футбол"))
 async def football_modes(message: Message):
     args = message.text.lower().split()
+
+    # 👉 если просто "футбол"
+    if len(args) == 1:
+        return await message.answer(
+            "⚽ Футбол\n\n"
+            "Режимы:\n"
+            "• девятка (x3)\n"
+            "• гол (x2)\n"
+            "• любой (x1.5)\n"
+            "• промах (x2)\n\n"
+            "Пример: футбол 1000 гол"
+        )
 
     if len(args) < 3:
         return await message.answer("⚽ футбол [ставка] [режим]")
@@ -642,24 +731,32 @@ async def football_modes(message: Message):
 
     win = 0
 
-    # value 4-5 = гол, 6 = девятка
-    if mode == "девятка" and value == 6:
-        win = bet * 3
+    # ЛОГИКА
+    if value == 6:
+        result = "🔥 ДЕВЯТКА"
+        if mode == "девятка":
+            win = bet * 3
+        elif mode == "гол":
+            win = bet * 2
+        elif mode == "любой":
+            win = int(bet * 1.5)
 
-    elif mode == "гол" and value >= 4:
-        win = bet * 2
+    elif value >= 4:
+        result = "⚽ ГОЛ"
+        if mode in ["гол", "любой"]:
+            win = bet * 2 if mode == "гол" else int(bet * 1.5)
 
-    elif mode == "любой" and value >= 3:
-        win = int(bet * 1.5)
-
-    elif mode == "промах" and value <= 2:
-        win = bet * 2
+    else:
+        result = "❌ ПРОМАХ"
+        if mode == "промах":
+            win = bet * 2
 
     if win:
         db.update_balance(user_id, win, "Футбол выигрыш")
 
     await message.answer(
-        f"⚽ Выпало: {value}\n"
+        f"{result}\n"
+        f"💰 Ставка: {bet}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
     
