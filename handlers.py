@@ -464,53 +464,6 @@ async def set_reward_command(message: Message):
     except ValueError:
         await message.answer("Неверная сумма.")
 
-@router.message(F.text.startswith("спин"))
-async def spin_game(message: Message):
-    args = message.text.split()
-
-    if len(args) != 2:
-        await message.answer("Использование: спин [ставка]")
-        return
-
-    try:
-        bet = int(args[1])
-        if bet <= 0:
-            await message.answer("Ставка должна быть больше 0.")
-            return
-    except:
-        await message.answer("Неверная ставка.")
-        return
-
-    user_id = message.from_user.id
-    balance = db.get_balance(user_id)
-
-    if balance < bet:
-        await message.answer(f"Недостаточно средств. Баланс: {balance} GALL")
-        return
-
-    # 🎰 Крутим слот
-    dice_msg = await message.answer_dice(emoji="🎰")
-
-    value = dice_msg.dice.value
-
-    # 🎯 Определяем результат
-    # (разбивка условная, Telegram не даёт прям символы, поэтому делаем через value)
-
-    if value in [1, 22, 43]:  # примерно 3 одинаковых
-        win = int(bet * 2)
-        db.update_balance(user_id, win, "Спин x2")
-        result_text = f"🎰 JACKPOT!\n💰 +{win} GALL (x2)"
-
-    elif value % 2 == 0:  # примерно 2 совпадения
-        win = int(bet * 1.5)
-        db.update_balance(user_id, win, "Спин x1.5")
-        result_text = f"🎰 Почти!\n💰 +{win} GALL (x1.5)"
-
-    else:
-        db.update_balance(user_id, -bet, "Спин проигрыш")
-        result_text = f"❌ Проигрыш\n-{bet} GALL"
-
-    await message.answer(result_text)
 
 @router.callback_query(F.data == "game_dice")
 async def game_dice(callback: CallbackQuery):
