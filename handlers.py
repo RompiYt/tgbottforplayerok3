@@ -108,13 +108,44 @@ async def games_button(message: Message):
 
 @router.callback_query(F.data == "cat_dynamic")
 async def cat_dynamic(callback: CallbackQuery):
-    await callback.message.edit_text("🎲 Динамические игры:\nЗдесь важен каждый ход.\nВыберите игру:", reply_markup=kb.dynamic_games_menu)
+    text = (
+        "🎲 ДИНАМИЧЕСКИЕ ИГРЫ\n"
+        "Здесь важен каждый ход. Просчитывай риски и забирай куш!\n\n"
+        "🎡 Рулетка\n"
+        "Ставка: [сумма] [тип]\n"
+        "Команды: го, отмена, повторить, удвоить, лог\n\n"
+        "🛣️ Дорога\n"
+        "Команда: дорога [сумма]\n\n"
+        "💣 Мины (Mines)\n"
+        "Команда: мин [ставка] [бомбы]\n\n"
+        "🎴 Хило (Hi-Lo)\n"
+        "Команда: хило [ставка]\n\n"
+        "🤡 Джокер (Joker)\n"
+        "Команда: дж [ставка]"
+    )
+    await callback.message.edit_text(text, reply_markup=kb.dynamic_games_menu)
     await callback.answer()
 
 @router.callback_query(F.data == "cat_static")
 async def cat_static(callback: CallbackQuery):
-    await callback.message.edit_text("🎲 Статические игры:\nИспытай удачу в один клик.\nВыберите игру:", reply_markup=kb.static_games_menu)
+    text = (
+        "🎲 СТАТИЧЕСКИЕ ИГРЫ\n"
+        "Испытай удачу в один клик. Моментальный результат!\n\n"
+        "🎰 Слот-машина\n"
+        "Команда: спин [ставка]\n\n"
+        "🎲 Кости (Dice)\n"
+        "Команда: кубик [ставка]\n\n"
+        "🎯 Дартс\n"
+        "Команда: дартс [ставка]\n\n"
+        "🏀 Баскетбол\n"
+        "Команда: баскет [ставка]\n\n"
+        "⚽ Футбол\n"
+        "Команда: футбол [ставка] [режим]"
+    )
+    await callback.message.edit_text(text, reply_markup=kb.static_games_menu)
     await callback.answer()
+
+
 
 @router.message(F.text == "Донат")
 async def donate_button(message: Message):
