@@ -17,9 +17,34 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    user = db.get_user(message.from_user.id)
+    args = message.text.split()
+    user_id = message.from_user.id
+
+    user = db.get_user(user_id)
     if not user:
-        db.create_user(message.from_user.id, message.from_user.username)
+        db.create_user(user_id, message.from_user.username)
+        # 🎯 ПРИГЛАШЕНИЕ
+        if len(args) > 1:
+            try:
+                inviter_id = int(args[1])
+
+                if inviter_id != user_id:
+                    added = db.add_invite(user_id, inviter_id)
+
+                    if added:
+                        # начисляем награду
+                        reward = 1000  # дефолт (можно из казны)
+
+                        db.update_balance(inviter_id, reward, "Приглашение")
+
+                        await message.answer(
+                            f"🎉 Вас пригласил пользователь!\n"
+                            f"Пригласивший получил {reward} GALL"
+                        )
+
+            except:
+                pass
+
     await message.answer(
         "Привет 👋 Я GALL! 💎\n\n"
         "💥 Скоротай время в мире азарта и крутых игр. Прокачивай свой скилл, соревнуйся с друзьями или просто испытай удачу — скучно точно не будет! ⚡️\n\n"
@@ -29,7 +54,7 @@ async def cmd_start(message: Message):
         "❓ Остались вопросы? — 👉 /help 😏",
         reply_markup=kb.main_menu
     )
-
+    
 @router.message(F.text.lower() == "б")
 async def balance_short(message: Message):
     balance = db.get_balance(message.from_user.id)
@@ -91,17 +116,18 @@ async def commands_button(message: Message):
         "💳 Твой кошелек:\n"
         "├ б — чекнуть счёт\n"
         "├ профиль — всё о твоём статусе\n"
-        "└ /history — логи твоих побед и трат\n\n"
+        "└ история — логи твоих побед и трат\n\n"
         "💸 Переводы и бонусы:\n"
-        "├ /п [сумма] — скинуть кэш (ответом)\n"
-        "├ /п [ID] [сумма] — перевод по ID\n"
-        "├ /промо [код] — забрать халяву\n"
-        "└ /top — заглянуть в список Forbes\n\n"
+        "├ п [сумма] — скинуть кэш (ответом)\n"
+        "├ п [ID] [сумма] — перевод по ID\n"
+        "├ промо [код] — забрать халяву\n"
+        "└ топ — заглянуть в список Forbes\n\n"
         "🚀 Для владельцев групп:\n"
         "├ /games — ⚙️ настройка игр (вкл/выкл)\n"
-        "├ /казна [сумма] — пополнить общий фонд\n"
-        "├ /казна — проверить баланс фонда группы\n"
-        "└ /награда [сумма] — выдать бонус из казны"
+        "├ казна [сумма] — пополнить общий фонд\n"
+        "├ казна — проверить баланс фонда группы\n"
+        "├ награда [сумма] — выдать бонус из казны\n"
+        "└ реф - реферальная ссылка"
     )
 
 @router.message(F.text == "игры")
@@ -211,20 +237,20 @@ async def help_command(message: Message):
     text = (
         "💎 Полный список команд GALL\n\n"
         "💳 Твой кошелек:\n"
-        "├ Бонус — получить бонус\n"
-        "├ Профиль — всё о твоём статусе,наличии валюты\n"
-        "└ /history — логи твоих побед и трат\n\n"
+        "├ бонус — получить бонус\n"
+        "├ профиль — всё о твоём статусе,наличии валюты\n"
+        "└ история — логи твоих побед и трат\n\n"
         "💸 Переводы и бонусы:\n"
         "├ п [сумма] — скинуть кэш (ответом)\n"
         "├ п [ID] [сумма] — перевод по ID\n"
         "├ промо [код] — забрать халяву\n"
-        "└ /top — заглянуть в список Forbes\n\n"
+        "└ топ — заглянуть в список Forbes\n\n"
         "🚀 Для владельцев групп:\n"
         "Хочешь привлечь игроков в свой чат? Используй казну!\n"
         "├ /games — ⚙️ настройка игр (вкл/выкл)\n"
         "├ казна — проверить баланс фонда группы\n"
         "├ награда [сумма] — выдать бонус из казны\n"
-        "├ /deposit [сумма] — пополнить казну\n"
+        "├ депозит [сумма] — пополнить казну\n"
         "└ /set_reward [сумма] — установить награду за приглашение"
     )
     await message.answer(text)
@@ -236,8 +262,9 @@ async def game_command(message: Message):
     await games_button(message)
 
 # /history
-@router.message(Command("history"))
-async def history_command(message: Message):
+@router.message(F.text.lower() == "история")
+async def history_text(message: Message):
+    await history_command(message)
     user_id = message.from_user.id
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -254,8 +281,9 @@ async def history_command(message: Message):
     await message.answer(text[:4000])  # ограничение Telegram
 
 # /top
-@router.message(Command("top"))
-async def top_command(message: Message):
+@router.message(F.text.lower() == "топ")
+async def top_text(message: Message):
+    await top_command(message)
     top_users = db.get_top_users(10)  # возвращает список (username, balance)
     if not top_users:
         await message.answer("Нет пользователей в рейтинге.")
@@ -266,9 +294,9 @@ async def top_command(message: Message):
         text += f"{i}. {name} — {balance} GALL\n"
     await message.answer(text)
     
-# Перевод: п [сумма] (ответом) или п [ID] [сумма]
-@router.message(Command("п"))
-async def transfer_command(message: Message):
+@router.message(F.text.lower().startswith("п "))
+async def transfer_text(message: Message):
+    await transfer_command(message)
     args = message.text.split()
     if len(args) == 2:
         # Перевод по ответу
@@ -322,9 +350,9 @@ async def transfer_command(message: Message):
     else:
         await message.answer("Использование: п [сумма] (ответом) или п [ID] [сумма]")
 
-# промо [код]
-@router.message(Command("промо"))
-async def promo_command(message: Message):
+@router.message(F.text.lower().startswith("промо"))
+async def promo_text(message: Message):
+    await promo_command(message)
     args = message.text.split()
     if len(args) != 2:
         await message.answer("Использование: промо [код]")
@@ -371,9 +399,9 @@ async def games_config(message: Message):
     status = "включены" if new_state else "отключены"
     await message.answer(f"Игры в группе {status}.")
 
-# казна (проверка баланса)
-@router.message(Command("казна"))
-async def treasury_info(message: Message):
+@router.message(F.text.lower().startswith("казна"))
+async def treasury_text(message: Message):
+    await treasury_info(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -385,9 +413,9 @@ async def treasury_info(message: Message):
             f"Изменить награду: /set_reward [сумма]")
     await message.answer(text)
 
-# награда [сумма] (выдать из казны пользователю)
-@router.message(Command("награда"))
-async def give_reward(message: Message):
+@router.message(F.text.lower().startswith("награда"))
+async def reward_text(message: Message):
+    await give_reward(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -419,8 +447,9 @@ async def give_reward(message: Message):
     except ValueError:
         await message.answer("Неверная сумма.")
 
-@router.message(Command("deposit"))
-async def deposit_treasury(message: Message):
+@router.message(F.text.lower().startswith("депозит"))
+async def deposit_text(message: Message):
+    await deposit_treasury(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -813,4 +842,12 @@ async def game_roulette(callback: CallbackQuery):
 async def game_mines(callback: CallbackQuery):
     await callback.answer("Мины в разработке!", show_alert=True)
 
+@router.message(F.text.lower() == "реф")
+async def ref_link(message: Message):
+    bot_username = (await message.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start={message.from_user.id}"
 
+    await message.answer(
+        f"🔗 Ваша реферальная ссылка:\n{link}\n\n"
+        "👥 Приглашай друзей и получай GALL!"
+    )
