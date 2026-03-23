@@ -48,6 +48,10 @@ def init_db():
                     balance INTEGER DEFAULT 0,
                     reward INTEGER DEFAULT 0
                 )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS invites (
+                    user_id INTEGER PRIMARY KEY,
+                    invited_by INTEGER
+               )''')
     conn.commit()
     conn.close()
 
@@ -234,3 +238,17 @@ def set_group_settings(group_id, enabled):
     c.execute("INSERT OR REPLACE INTO groups (group_id, games_enabled) VALUES (?, ?)", (group_id, enabled))
     conn.commit()
     conn.close()
+
+def add_invite(user_id, inviter_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute("SELECT user_id FROM invites WHERE user_id=?", (user_id,))
+    if c.fetchone():
+        conn.close()
+        return False
+
+    c.execute("INSERT INTO invites (user_id, invited_by) VALUES (?, ?)", (user_id, inviter_id))
+    conn.commit()
+    conn.close()
+    return True
