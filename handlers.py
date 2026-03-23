@@ -7,6 +7,7 @@ import datetime
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ChatMemberStatus
 import sqlite3
+import asyncio
 
 from config import *
 import database as db
@@ -467,11 +468,11 @@ async def set_reward_command(message: Message):
 
 
 @router.message(F.text.startswith("кубик"))
-async def dice_game(message: Message):
-    args = message.text.split()
+async def dice_modes(message: Message):
+    args = message.text.lower().split()
 
-    if len(args) < 2:
-        return await message.answer("🎲 кубик [ставка]")
+    if len(args) < 3:
+        return await message.answer("🎲 Пример: кубик 1000 чет")
 
     bet = int(args[1])
     user_id = message.from_user.id
@@ -484,30 +485,58 @@ async def dice_game(message: Message):
     msg = await message.answer_dice(emoji="🎲")
     value = msg.dice.value
 
-    if value >= 4:
-        result = f"🎲 Выпало {value}"
-        win = bet * 2
+    await asyncio.sleep(2)
+    
+    mode = args[2:]
+    win = 0
+
+    # ЧЕТ / НЕЧЕТ
+    if mode[0] == "чет":
+        if value % 2 == 0:
+            win = bet * 2
+
+    elif mode[0] == "нечет":
+        if value % 2 == 1:
+            win = bet * 2
+
+    # БОЛЬШЕ / МЕНЬШЕ
+    elif mode[0] == "больше" and len(mode) >= 2:
+        num = int(mode[1])
+        if value > num:
+            win = int(bet * 1.5)
+
+    elif mode[0] == "меньше" and len(mode) >= 2:
+        num = int(mode[1])
+        if value < num:
+            win = int(bet * 1.7)
+
+    # ТОЧНЫЕ ЧИСЛА
     else:
-        result = f"🎲 Выпало {value}"
-        win = 0
+        try:
+            numbers = list(map(int, mode))
+            if value in numbers:
+                coef = 5.5 / len(numbers)
+                win = int(bet * coef)
+        except:
+            pass
 
     if win:
         db.update_balance(user_id, win, "Кубик выигрыш")
 
     await message.answer(
-        f"{result}\n"
-        f"💰 Ставка: {bet}\n"
+        f"🎲 Выпало: {value}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("дартс"))
-async def darts_game(message: Message):
-    args = message.text.split()
+async def darts_modes(message: Message):
+    args = message.text.lower().split()
 
-    if len(args) < 2:
-        return await message.answer("🎯 дартс [ставка]")
+    if len(args) < 3:
+        return await message.answer("🎯 дартс [ставка] [режим]")
 
     bet = int(args[1])
+    mode = args[2]
     user_id = message.from_user.id
 
     if db.get_balance(user_id) < bet:
@@ -518,36 +547,39 @@ async def darts_game(message: Message):
     msg = await message.answer_dice(emoji="🎯")
     value = msg.dice.value
 
-    if value == 6:
-        result = "🎯 ЦЕНТР"
-        win = bet * 5
-    elif value >= 4:
-        result = "🟡 РЯДОМ"
+    await asyncio.sleep(2)
+
+    win = 0
+
+    if mode == "центр" and value == 6:
         win = bet * 2
-    elif value >= 2:
-        result = "⚪ ДАЛЕКО"
-        win = 0
-    else:
-        result = "❌ МИМО"
-        win = 0
+
+    elif mode == "мимо" and value <= 2:
+        win = bet * 2
+
+    elif mode == "кр" and value >= 4:
+        win = bet * 2
+
+    elif mode == "бел" and value == 3:
+        win = bet * 2
 
     if win:
         db.update_balance(user_id, win, "Дартс выигрыш")
 
     await message.answer(
-        f"{result}\n"
-        f"💰 Ставка: {bet}\n"
+        f"🎯 Выпало: {value}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("баскет"))
-async def basket_game(message: Message):
-    args = message.text.split()
+async def basket_modes(message: Message):
+    args = message.text.lower().split()
 
     if len(args) < 2:
-        return await message.answer("🏀 баскет [ставка]")
+        return await message.answer("🏀 баскет [ставка] [режим]")
 
     bet = int(args[1])
+    mode = args[2] if len(args) > 2 else "классика"
     user_id = message.from_user.id
 
     if db.get_balance(user_id) < bet:
@@ -558,33 +590,44 @@ async def basket_game(message: Message):
     msg = await message.answer_dice(emoji="🏀")
     value = msg.dice.value
 
-    if value == 6:
-        result = "💦 СПЛЕШ"
-        win = bet * 3
-    elif value >= 4:
-        result = "✅ ПОПАЛ"
-        win = bet * 2
-    else:
-        result = "❌ МИМО"
-        win = 0
+    await asyncio.sleep(2)
+    
+    win = 0
+
+    # КЛАССИКА
+    if mode == "классика":
+        if value == 6:
+            win = bet * 3
+        elif value >= 4:
+            win = bet * 2
+
+    # СПЕЦ СТАВКИ
+    elif mode == "гол" and value >= 4:
+        win = int(bet * 1.9)
+
+    elif mode == "чисто" and value == 6:
+        win = int(bet * 3.5)
+
+    elif mode == "мимо" and value < 4:
+        win = int(bet * 1.5)
 
     if win:
         db.update_balance(user_id, win, "Баскет выигрыш")
 
     await message.answer(
-        f"{result}\n"
-        f"💰 Ставка: {bet}\n"
+        f"🏀 Выпало: {value}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
 @router.message(F.text.startswith("футбол"))
-async def football_game(message: Message):
-    args = message.text.split()
+async def football_modes(message: Message):
+    args = message.text.lower().split()
 
-    if len(args) < 2:
-        return await message.answer("⚽ футбол [ставка]")
+    if len(args) < 3:
+        return await message.answer("⚽ футбол [ставка] [режим]")
 
     bet = int(args[1])
+    mode = args[2]
     user_id = message.from_user.id
 
     if db.get_balance(user_id) < bet:
@@ -595,20 +638,30 @@ async def football_game(message: Message):
     msg = await message.answer_dice(emoji="⚽")
     value = msg.dice.value
 
-    if value >= 4:
-        result = "⚽ ГОООЛ!"
+    await asyncio.sleep(2)
+
+    win = 0
+
+    # value 4-5 = гол, 6 = девятка
+    if mode == "девятка" and value == 6:
+        win = bet * 3
+
+    elif mode == "гол" and value >= 4:
         win = bet * 2
-    else:
-        result = "❌ ПРОМАХ"
-        win = 0
+
+    elif mode == "любой" and value >= 3:
+        win = int(bet * 1.5)
+
+    elif mode == "промах" and value <= 2:
+        win = bet * 2
 
     if win:
         db.update_balance(user_id, win, "Футбол выигрыш")
 
     await message.answer(
-        f"{result}\n"
-        f"💰 Ставка: {bet}\n"
+        f"⚽ Выпало: {value}\n"
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
+    )
     )
 
 @router.callback_query(F.data == "game_roulette")
