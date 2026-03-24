@@ -1213,19 +1213,16 @@ async def create_promo(message: Message):
         return await message.answer("❌ Нет доступа")
 
     args = message.text.split()
-
     if len(args) != 3:
         return await message.answer(
             "❌ Использование:\n/promo КОД СУММА\n\nПример:\n/promo BONUS 1000"
         )
 
     code = args[1].strip()
-    
     try:
         reward = int(args[2])
     except:
         return await message.answer("❌ Сумма должна быть числом")
-
     if reward <= 0:
         return await message.answer("❌ Сумма должна быть больше 0")
 
@@ -1238,12 +1235,11 @@ async def create_promo(message: Message):
         conn.close()
         return await message.answer("❌ Такой промокод уже существует")
 
-    # создаём
+    # создаём промокод
     c.execute(
         "INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
         (code, reward)
     )
-
     conn.commit()
     conn.close()
 
@@ -1252,7 +1248,7 @@ async def create_promo(message: Message):
         f"Код: {code}\n"
         f"Награда: {reward} GALL"
     )
-
+    
 @router.callback_query(F.data == "delete_promo")
 async def delete_promo_info(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
@@ -1272,14 +1268,12 @@ async def delete_promo(message: Message):
         return await message.answer("❌ Нет доступа")
 
     args = message.text.split()
-
     if len(args) != 2:
         return await message.answer(
             "❌ Использование:\n/delpromo КОД\n\nПример:\n/delpromo BONUS100"
         )
 
     code = args[1].strip()
-
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
