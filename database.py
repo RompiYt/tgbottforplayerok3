@@ -5,17 +5,22 @@ import string
 
 DB_PATH = "bot.db"
 
+# -------------------------
+# Инициализация базы данных
+# -------------------------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # Таблица пользователей
+    
+    # Пользователи
     c.execute('''CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
                     balance INTEGER DEFAULT 0,
                     last_bonus TIMESTAMP
                 )''')
-    # Таблица транзакций
+    
+    # Транзакции
     c.execute('''CREATE TABLE IF NOT EXISTS transactions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -23,7 +28,8 @@ def init_db():
                     reason TEXT,
                     timestamp TIMESTAMP
                 )''')
-    # Таблица чеков
+    
+    # Чеки
     c.execute('''CREATE TABLE IF NOT EXISTS checks (
                     code TEXT PRIMARY KEY,
                     amount INTEGER,
@@ -31,31 +37,40 @@ def init_db():
                     created_at TIMESTAMP,
                     claimed_by INTEGER
                 )''')
-    # Таблица промокодов
+    
+    # Промокоды
     c.execute('''CREATE TABLE IF NOT EXISTS promocodes (
                     code TEXT PRIMARY KEY,
                     reward INTEGER,
                     used_by INTEGER
                 )''')
-    # Таблица настроек игр в группах
+    
+    # Настройки групп
     c.execute('''CREATE TABLE IF NOT EXISTS groups (
                     group_id INTEGER PRIMARY KEY,
                     games_enabled INTEGER DEFAULT 1
                 )''')
-    # Таблица казны групп (баланс и награда за приглашение)
+    
+    # Казна групп
     c.execute('''CREATE TABLE IF NOT EXISTS group_treasury (
                     group_id INTEGER PRIMARY KEY,
                     balance INTEGER DEFAULT 0,
                     reward INTEGER DEFAULT 0
                 )''')
+    
+    # Приглашения
     c.execute('''CREATE TABLE IF NOT EXISTS invites (
                     user_id INTEGER PRIMARY KEY,
                     invited_by INTEGER
                )''')
+    
     conn.commit()
     conn.close()
 
-# --- Функции для пользователей ---
+
+# -------------------------
+# Пользователи
+# -------------------------
 def get_user(user_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -65,12 +80,15 @@ def get_user(user_id):
     return row
 
 def create_user(user_id, username):
+    if get_user(user_id):
+        return False
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO users (user_id, username, balance, last_bonus) VALUES (?, ?, ?, ?)",
-              (user_id, username, 0, None))  # важно: last_bonus = None
+              (user_id, username, 0, None))
     conn.commit()
     conn.close()
+    return True
 
 def update_balance(user_id, delta, reason):
     conn = sqlite3.connect(DB_PATH)
@@ -80,7 +98,6 @@ def update_balance(user_id, delta, reason):
               (user_id, delta, reason, datetime.datetime.now().isoformat()))
     conn.commit()
     conn.close()
-    # вернуть новый баланс
     user = get_user(user_id)
     return user[2] if user else None
 
@@ -102,30 +119,27 @@ def get_last_bonus(user_id):
         return datetime.datetime.fromisoformat(user[3])
     return None
 
-# --- Функции для казны групп ---
+
+# -------------------------
+# Казна групп
+# -------------------------
 def get_group_treasury(group_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT balance, reward FROM group_treasury WHERE group_id=?", (group_id,))
     row = c.fetchone()
-    conn.close()
-    if row:
-        return {"balance": row[0], "reward": row[1]}
-    else:
-        # Создаём запись по умолчанию
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("INSERT INTO group_treasury (group_id, balance, reward) VALUES (?, ?, ?)",
-                  (group_id, 0, 0))
+    if not row:
+        c.execute("INSERT INTO group_treasury (group_id, balance, reward) VALUES (?, ?, ?)", (group_id, 0, 0))
         conn.commit()
-        conn.close()
-        return {"balance": 0, "reward": 0}
+        row = (0, 0)
+    conn.close()
+    return {"balance": row[0], "reward": row[1]}
 
 def update_group_treasury(group_id, delta_balance=0, delta_reward=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if delta_reward is not None:
-        c.execute("UPDATE group_treasury SET reward = ? WHERE group_id=?", (delta_reward, group_id))
+        c.execute("UPDATE group_treasury SET reward=? WHERE group_id=?", (delta_reward, group_id))
     if delta_balance != 0:
         c.execute("UPDATE group_treasury SET balance = balance + ? WHERE group_id=?", (delta_balance, group_id))
     conn.commit()
@@ -140,7 +154,10 @@ def add_to_treasury(group_id, amount):
 def subtract_from_treasury(group_id, amount):
     update_group_treasury(group_id, delta_balance=-amount)
 
-# --- Функции для чеков ---
+
+# -------------------------
+# Чеки
+# -------------------------
 def generate_check_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
@@ -173,11 +190,13 @@ def use_check(code, user_id):
     c.execute("UPDATE checks SET claimed_by=? WHERE code=?", (user_id, code))
     conn.commit()
     conn.close()
-    # Начисляем сумму пользователю
     update_balance(user_id, amount, f"Активация чека {code}")
     return amount, None
 
-# --- Функции для промокодов ---
+
+# -------------------------
+# Промокоды
+# -------------------------
 def create_promo(code, reward):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -200,7 +219,10 @@ def use_promo(code, user_id):
     update_balance(user_id, reward, f"Промокод {code}")
     return reward, None
 
-# --- Функции для топ-10 ---
+
+# -------------------------
+# Топ пользователей
+# -------------------------
 def get_top_users(limit=10):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -208,8 +230,7 @@ def get_top_users(limit=10):
     rows = c.fetchall()
     conn.close()
     return rows
-    
-# --- Функции для истории ---
+
 def get_user_history(user_id, limit=10):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -219,7 +240,10 @@ def get_user_history(user_id, limit=10):
     conn.close()
     return rows
 
-# --- Функции для групп (игровые настройки) ---
+
+# -------------------------
+# Настройки групп
+# -------------------------
 def get_group_settings(group_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -228,9 +252,7 @@ def get_group_settings(group_id):
     conn.close()
     if row:
         return row[0]
-    else:
-        # По умолчанию игры включены
-        return 1
+    return 1
 
 def set_group_settings(group_id, enabled):
     conn = sqlite3.connect(DB_PATH)
@@ -239,9 +261,21 @@ def set_group_settings(group_id, enabled):
     conn.commit()
     conn.close()
 
+
+# -------------------------
+# Приглашения
+# -------------------------
 def add_invite(user_id, inviter_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    c.execute("SELECT user_id FROM invites WHERE user_id=?", (user_id,))
+    if c.fetchone():
+        conn.close()
+        return False
+    c.execute("INSERT INTO invites (user_id, invited_by) VALUES (?, ?)", (user_id, inviter_id))
+    conn.commit()
+    conn.close()
+    return True
 
     c.execute("SELECT user_id FROM invites WHERE user_id=?", (user_id,))
     if c.fetchone():
