@@ -1177,9 +1177,9 @@ async def admin_panel(callback: CallbackQuery):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎟 Создать промокод", callback_data="create_promo")],
-        [InlineKeyboardButton(text="❌ Удалить промокод", callback_data="delete_promo")]
+        [InlineKeyboardButton(text="❌ Удалить промокод", callback_data="delete_promo")],
+        [InlineKeyboardButton(text="📋 Список промокодов", callback_data="list_promos")]
     ])
-
     await callback.message.edit_text(
         "🛠 Админ панель\n\nВыберите действие:",
         reply_markup=keyboard
@@ -1192,25 +1192,33 @@ async def create_promo(message: Message):
         return await message.answer("❌ Нет доступа")
 
     args = message.text.split()
-    if len(args) != 3:
+    if len(args) != 4:
         return await message.answer(
-            "❌ Использование:\n/promo КОД СУММА\nПример:\n/promo BONUS 1000"
+            "❌ Использование:\n/promo КОД СУММА КОЛ-ВО\n\nПример:\n/promo BONUS 1000 5"
         )
 
-    code = args[1].strip().upper()
+    code = args[1].upper()
+
     try:
         reward = int(args[2])
-    except ValueError:
-        return await message.answer("❌ Сумма должна быть числом")
-    if reward <= 0:
-        return await message.answer("❌ Сумма должна быть больше 0")
+        max_uses = int(args[3])
+    except:
+        return await message.answer("❌ Сумма и кол-во должны быть числами")
+
+    if reward <= 0 or max_uses <= 0:
+        return await message.answer("❌ Значения должны быть больше 0")
 
     try:
-        db.create_promo(code, reward)
-    except Exception:
-        return await message.answer("❌ Такой промокод уже существует")
+        db.create_promo(code, reward, max_uses)
+    except:
+        return await message.answer("❌ Такой промокод уже есть")
 
-    await message.answer(f"✅ Промокод создан!\nКод: {code}\nНаграда: {reward} GALL")
+    await message.answer(
+        f"✅ Промокод создан!\n\n"
+        f"Код: {code}\n"
+        f"Награда: {reward}\n"
+        f"Активаций: {max_uses}"
+    )
 
 @router.callback_query(F.data == "create_promo")
 async def create_promo_info(callback: CallbackQuery):
@@ -1254,3 +1262,26 @@ async def delete_promo(message: Message):
         await message.answer(f"✅ Промокод {code} удалён")
     else:
         await message.answer("❌ Промокод не найден")
+
+@router.callback_query(F.data == "list_promos")
+async def list_promos(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
+
+    await callback.answer()
+
+    promos = db.get_all_promos()
+
+    if not promos:
+        return await callback.message.answer("📭 Промокодов нет")
+
+    text = "📋 Список промокодов:\n\n"
+
+    for code, reward, uses, max_uses in promos:
+        text += (
+            f"🎟 {code}\n"
+            f"💰 Награда: {reward}\n"
+            f"📊 Использовано: {uses}/{max_uses}\n\n"
+        )
+
+    await callback.message.answer(text)
