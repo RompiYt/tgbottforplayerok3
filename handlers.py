@@ -292,17 +292,20 @@ async def history_text(message: Message):
     await message.answer(text[:4000])  # ограничение Telegram
 
 # /top
-@router.message(F.text.lower() == "топ")
+@router.message(lambda message: message.text and message.text.lower() == "топ")
 async def top_text(message: Message):
-    await top_command(message)
-    top_users = db.get_top_users(10)  # возвращает список (username, balance)
+    top_users = db.get_top_users(10)
+
     if not top_users:
         await message.answer("Нет пользователей в рейтинге.")
         return
+
     text = "🏆 Топ-10 игроков по балансу:\n\n"
+
     for i, (username, balance) in enumerate(top_users, 1):
         name = username if username else "Аноним"
         text += f"{i}. {name} — {balance} GALL\n"
+
     await message.answer(text)
     
 @router.message(F.text.lower().startswith("п "))
