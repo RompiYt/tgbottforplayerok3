@@ -10,6 +10,7 @@ import sqlite3
 import asyncio
 from aiogram.types import FSInputFile
 
+from config import ADMINS
 from config import *
 import database as db
 import keyboards as kb
@@ -20,6 +21,9 @@ roulette_history = {}  # chat_id: [результаты]
 last_user_bets = {}  # user_id: (chat_id, bet_data)
 
 router = Router()
+
+def is_admin(user_id):
+    return user_id in ADMINS
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
@@ -50,7 +54,12 @@ async def cmd_start(message: Message):
 
             except:
                 pass
-
+    if is_admin(user_id):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🛠 Админ панель", callback_data="admin_panel")]
+        ])
+        await message.answer("👑 Вы админ", reply_markup=keyboard)
+        
     await message.answer(
         "Привет 👋 Я GALL! 💎\n\n"
         "💥 Скоротай время в мире азарта и крутых игр. Прокачивай свой скилл, соревнуйся с друзьями или просто испытай удачу — скучно точно не будет! ⚡️\n\n"
@@ -1169,3 +1178,120 @@ async def double_bet(callback: CallbackQuery):
     await callback.message.answer(f"💥 Ставка удвоена: {bet} на {' '.join(items)}")
 
     await callback.answer("💥 Ставка удвоена")
+
+@router.callback_query(F.data == "admin_panel")
+async def admin_panel(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎟 Создать промокод", callback_data="create_promo")],
+        [InlineKeyboardButton(text="❌ Удалить промокод", callback_data="delete_promo")]
+    ])
+
+    await callback.message.edit_text(
+        "🛠 Админ панель\n\nВыберите действие:",
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data == "create_promo")
+async def create_promo_info(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
+
+    await callback.message.answer(
+        "🎟 Создание промокода\n\n"
+        "Введите команду:\n"
+        "/promo КОД СУММА\n\n"
+        "Пример:\n"
+        "/promo BONUS100 2500"
+    )
+
+@router.message(Command("promo"))
+async def create_promo(message: Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("❌ Нет доступа")
+
+    args = message.text.split()
+
+    if len(args) != 3:
+        return await message.answer(
+            "❌ Использование:\n/promo КОД СУММА\n\nПример:\n/promo BONUS 1000"
+        )
+
+    code = args[1].strip()
+    
+    try:
+        reward = int(args[2])
+    except:
+        return await message.answer("❌ Сумма должна быть числом")
+
+    if reward <= 0:
+        return await message.answer("❌ Сумма должна быть больше 0")
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # проверка на существование
+    c.execute("SELECT code FROM promocodes WHERE code=?", (code,))
+    if c.fetchone():
+        conn.close()
+        return await message.answer("❌ Такой промокод уже существует")
+
+    # создаём
+    c.execute(
+        "INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
+        (code, reward)
+    )
+
+    conn.commit()
+    conn.close()
+
+    await message.answer(
+        f"✅ Промокод создан!\n\n"
+        f"Код: {code}\n"
+        f"Награда: {reward} GALL"
+    )
+
+@router.callback_query(F.data == "delete_promo")
+async def delete_promo_info(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
+
+    await callback.message.answer(
+        "❌ Удаление промокода\n\n"
+        "Введите команду:\n"
+        "/delpromo КОД\n\n"
+        "Пример:\n"
+        "/delpromo BONUS100"
+    )
+
+@router.message(Command("delpromo"))
+async def delete_promo(message: Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("❌ Нет доступа")
+
+    args = message.text.split()
+
+    if len(args) != 2:
+        return await message.answer(
+            "❌ Использование:\n/delpromo КОД\n\nПример:\n/delpromo BONUS100"
+        )
+
+    code = args[1].strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # проверка существования
+    c.execute("SELECT code FROM promocodes WHERE code=?", (code,))
+    if not c.fetchone():
+        conn.close()
+        return await message.answer("❌ Промокод не найден")
+
+    # удаление
+    c.execute("DELETE FROM promocodes WHERE code=?", (code,))
+    conn.commit()
+    conn.close()
+
+    await message.answer(f"✅ Промокод {code} удалён")
