@@ -1039,14 +1039,27 @@ async def cancel_bets(message: Message):
     if not user_bets:
         return await message.answer("❌ У вас нет ставок для отмены")
 
-    # Возврат денег
+    total_refund = 0
+
     for b in user_bets:
-        db.update_balance(user_id, b["bet"], "Отмена ставки")
+        bet = b["bet"]
+        items = b["items"]
 
-    # Удаляем ставки пользователя
-    roulette_bets[chat_id] = [b for b in roulette_bets[chat_id] if b["user_id"] != user_id]
+        refund = bet * len(items)  # 💥 ВОТ ГЛАВНОЕ
+        total_refund += refund
 
-    await message.answer(f"💸 Все ваши ставки отменены, {len(user_bets)} ставка(ок) возвращены на баланс")
+    # 💰 возвращаем ВСЁ разом
+    db.update_balance(user_id, total_refund, "Отмена ставок")
+
+    # ❌ удаляем ставки
+    roulette_bets[chat_id] = [
+        b for b in roulette_bets[chat_id] if b["user_id"] != user_id
+    ]
+
+    await message.answer(
+        f"💸 Ставки отменены\n"
+        f"Возвращено: {total_refund} GALL"
+    )
 
 @router.message(F.text.regexp(r"^\d+"))
 async def collect_bets(message: Message):
