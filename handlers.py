@@ -1194,19 +1194,6 @@ async def admin_panel(callback: CallbackQuery):
         reply_markup=keyboard
     )
 
-@router.callback_query(F.data == "create_promo")
-async def create_promo_info(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        return await callback.answer("❌ Нет доступа", show_alert=True)
-
-    await callback.message.answer(
-        "🎟 Создание промокода\n\n"
-        "Введите команду:\n"
-        "/promo КОД СУММА\n\n"
-        "Пример:\n"
-        "/promo BONUS100 2500"
-    )
-
 @router.message(Command("promo"))
 async def create_promo(message: Message):
     if not is_admin(message.from_user.id):
@@ -1215,13 +1202,13 @@ async def create_promo(message: Message):
     args = message.text.split()
     if len(args) != 3:
         return await message.answer(
-            "❌ Использование:\n/promo КОД СУММА\n\nПример:\n/promo BONUS 1000"
+            "❌ Использование:\n/promo КОД СУММА\nПример:\n/promo BONUS 1000"
         )
 
-    code = args[1].strip()
+    code = args[1].strip().upper()
     try:
         reward = int(args[2])
-    except:
+    except ValueError:
         return await message.answer("❌ Сумма должна быть числом")
     if reward <= 0:
         return await message.answer("❌ Сумма должна быть больше 0")
@@ -1236,18 +1223,12 @@ async def create_promo(message: Message):
         return await message.answer("❌ Такой промокод уже существует")
 
     # создаём промокод
-    c.execute(
-        "INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
-        (code, reward)
-    )
+    c.execute("INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
+              (code, reward))
     conn.commit()
     conn.close()
 
-    await message.answer(
-        f"✅ Промокод создан!\n\n"
-        f"Код: {code}\n"
-        f"Награда: {reward} GALL"
-    )
+    await message.answer(f"✅ Промокод создан!\nКод: {code}\nНаграда: {reward} GALL")
     
 @router.callback_query(F.data == "delete_promo")
 async def delete_promo_info(callback: CallbackQuery):
