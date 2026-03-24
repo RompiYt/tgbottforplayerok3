@@ -195,7 +195,7 @@ async def cat_static(callback: CallbackQuery):
 @router.message(F.text.lower() == "донат")
 async def donate_button(message: Message):
     text = (
-        "⭐ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        "⭐️ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
         "Вы можете мгновенно приобрести валюту через Telegram Stars.\n"
         "Это самый быстрый и безопасный способ стать богаче в игре!\n\n"
         "💎 Что дают GALL?\n"
@@ -205,44 +205,47 @@ async def donate_button(message: Message):
         "━━━━━━━━━━━━━━━━━━━━\n"
         "⬇️ Нажмите кнопку ниже, чтобы перейти к покупке:"
     )
-    buy_button = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Купить GALL", callback_data="show_donation_plans")]
-    ])
-    await message.answer(text, reply_markup=buy_button)
+    # Кнопка "Выбрать план"
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton(text="Купить GALL", callback_data="show_donation_plans")
+    )
+    await message.answer(text, reply_markup=keyboard)
 
 @router.callback_query(F.data == "show_donation_plans")
 async def show_donation_plans(callback: CallbackQuery):
     keyboard = InlineKeyboardMarkup(row_width=2)
     for stars, info in DONATION_PLANS.items():
-        text = f"⭐ {stars} → +{info['gall']}"
+        text = f"⭐ {stars} → +{info['gall']} GALL"
         if info.get("bonus"):
             text += f" (+{info['bonus']}% бонус)"
-        keyboard.add(InlineKeyboardButton(text=text, callback_data=f"donate_{stars}"))
-    await callback.message.edit_text(
+        keyboard.add(
+            InlineKeyboardButton(text=text, callback_data=f"donate_{stars}")
+        )
+    await callback.message.answer(
         "💎 Выберите количество звезд для покупки GALL:",
         reply_markup=keyboard
     )
     await callback.answer()
 
-@router.callback_query(F.data.startswith("donate_"))
+@router.callback_query(F.data.regexp(r"^donate_\d+$"))
 async def handle_donate(callback: CallbackQuery):
     user_id = callback.from_user.id
-    data = callback.data  # например: donate_10
-    try:
-        stars = int(data.split("_")[1])
-    except:
+    stars = int(callback.data.split("_")[1])
+
+    plan = DONATION_PLANS.get(stars)
+    if not plan:
         return await callback.answer("❌ Ошибка плана", show_alert=True)
-    
-    success, result = db.add_donation(user_id, stars)
-    if not success:
-        await callback.answer(result, show_alert=True)
-        return
-    
+
+    gall = plan['gall']
+    bonus = plan.get('bonus', 0)
+    total = gall + int(gall * bonus / 100)
+
+    db.update_balance(user_id, total, f"Покупка за {stars} Stars")
     await callback.message.answer(
-        f"💎 Вы успешно приобрели {result} GALL за {stars} ⭐ Stars!"
+        f"💎 Вы успешно приобрели {total} GALL за {stars} ⭐ Stars!"
     )
     await callback.answer("✅ Донат обработан")
-
 
 # Обработчик для кнопки "Пойти играть" после бонуса
 @router.callback_query(F.data == "go_play")
