@@ -839,9 +839,8 @@ async def football_modes(message: Message):
     )
     
 
-@router.message()
+@router.message(F.text.regexp(r"^\d+"))
 async def collect_bets(message: Message):
-    import time
 
     text = message.text.lower().split()
 
