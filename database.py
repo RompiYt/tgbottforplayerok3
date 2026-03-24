@@ -197,10 +197,13 @@ def use_check(code, user_id):
 # -------------------------
 # Промокоды
 # -------------------------
-def create_promo(code, reward):
+def create_promo(code: str, reward: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, ?)", (code, reward, None))
+    c.execute(
+        "INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
+        (code.upper(), reward)
+    )
     conn.commit()
     conn.close()
 
