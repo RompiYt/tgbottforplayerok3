@@ -3,9 +3,9 @@ from config import CHAT_LINK
 
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Чаты"), KeyboardButton(text="Профиль")],
-        [KeyboardButton(text="Команды"), KeyboardButton(text="Бонус")],
-        [KeyboardButton(text="Игры"), KeyboardButton(text="Донат")]
+        [KeyboardButton(text="чаты"), KeyboardButton(text="профиль")],
+        [KeyboardButton(text="команды"), KeyboardButton(text="бонус")],
+        [KeyboardButton(text="игры"), KeyboardButton(text="донат")]
     ],
     resize_keyboard=True
 )
