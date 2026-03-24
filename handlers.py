@@ -302,7 +302,6 @@ async def top_text(message: Message):
     
 @router.message(F.text.lower().startswith("п "))
 async def transfer_text(message: Message):
-    await transfer_command(message)
     args = message.text.split()
     if len(args) == 2:
         # Перевод по ответу
