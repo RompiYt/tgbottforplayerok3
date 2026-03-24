@@ -153,8 +153,6 @@ async def cat_dynamic(callback: CallbackQuery):
         "🔴 Рулетка\n"
         "L Ставка: [сумма] [тип]\n"
         "L Команды: го, отмена, повторить, удвоить, лог\n\n"
-        "⚫ Мины (Mines)\n"
-        "L Команда: мин [ставка] [бомбы]\n"
     )
     await callback.message.edit_text(
         text,
@@ -169,8 +167,6 @@ async def cat_static(callback: CallbackQuery):
     text = (
         "💎 СТАТИЧЕСКИЕ ИГРЫ\n\n"
         "Испытай удачу в один клик. Моментальный результат! 💎\n\n"
-        "🔴 Слот-машина\n"
-        "L Команда: спин [ставка]\n\n"
         "🟢 Кости (Dice)\n"
         "L Команда: кубик [ставка]\n\n"
         "🟣 Дартс\n"
@@ -916,10 +912,13 @@ async def spin_roulette(message: Message):
             elif "-" in item:
                 try:
                     start, end = map(int, item.split("-"))
-                    if start <= number <= end:
-                        count = end - start + 1
-                        coef = 36 / count
-                        win = int(bet * coef)
+
+                    numbers = list(range(start, end + 1))
+                    part_bet = bet / len(numbers)  # делим ставку
+
+                if number in numbers:
+                    win = int(part_bet * 36)
+
                 except:
                     pass
 
@@ -1055,6 +1054,26 @@ async def collect_bets(message: Message):
     text = message.text.lower().split()
     if not text or not text[0].isdigit():
         return
+
+    # проверка каждого элемента ставки
+    for item in items:
+
+    # число
+        if item.isdigit():
+            num = int(item)
+            if num < 0 or num > 36:
+                return await message.answer("❌ Числа только от 0 до 36")
+
+    # диапазон
+        elif "-" in item:
+            try:
+                start, end = map(int, item.split("-"))
+
+                if start < 0 or end > 36 or start > end:
+                    return await message.answer("❌ Диапазон должен быть от 0 до 36")
+
+            except:
+                return await message.answer("❌ Неверный формат диапазона")
 
     bet = int(text[0])
     items = text[1:]
