@@ -212,14 +212,37 @@ async def donate_button(message: Message):
 
 @router.callback_query(F.data == "show_donation_plans")
 async def show_donation_plans(callback: CallbackQuery):
-    text = "💎 Выберите сумму пополнения:\n\n"
+    keyboard = InlineKeyboardMarkup(row_width=2)
     for stars, info in DONATION_PLANS.items():
-        text += f"⭐ {stars} Stars → +{info['gall']} GALL"
-        if info['bonus']:
+        text = f"⭐ {stars} → +{info['gall']}"
+        if info.get("bonus"):
             text += f" (+{info['bonus']}% бонус)"
-        text += "\n"
-    await callback.message.edit_text(text)
+        keyboard.add(InlineKeyboardButton(text=text, callback_data=f"donate_{stars}"))
+    await callback.message.edit_text(
+        "💎 Выберите количество звезд для покупки GALL:",
+        reply_markup=keyboard
+    )
     await callback.answer()
+
+@router.callback_query(F.data.startswith("donate_"))
+async def handle_donate(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    data = callback.data  # например: donate_10
+    try:
+        stars = int(data.split("_")[1])
+    except:
+        return await callback.answer("❌ Ошибка плана", show_alert=True)
+    
+    success, result = db.add_donation(user_id, stars)
+    if not success:
+        await callback.answer(result, show_alert=True)
+        return
+    
+    await callback.message.answer(
+        f"💎 Вы успешно приобрели {result} GALL за {stars} ⭐ Stars!"
+    )
+    await callback.answer("✅ Донат обработан")
+
 
 # Обработчик для кнопки "Пойти играть" после бонуса
 @router.callback_query(F.data == "go_play")
