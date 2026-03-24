@@ -838,47 +838,6 @@ async def football_modes(message: Message):
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
     
-
-@router.message(F.text.regexp(r"^\d+"))
-async def collect_bets(message: Message):
-
-    text = message.text.lower().split()
-
-    if not text or not text[0].isdigit():
-        return
-
-    bet = int(text[0])
-    items = text[1:]
-
-    if not items:
-        return
-
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-
-    if db.get_balance(user_id) < bet:
-        return await message.answer("❌ Недостаточно средств")
-
-    db.update_balance(user_id, -bet, "Рулетка ставка")
-
-    if chat_id not in roulette_bets:
-        roulette_bets[chat_id] = []
-
-    roulette_bets[chat_id].append({
-        "user": message.from_user.full_name,
-        "user_id": user_id,
-        "bet": bet,
-        "items": items
-    })
-
-    # 🧾 вывод списка ставок
-    text_out = "📊 Ставки:\n\n"
-
-    for b in roulette_bets[chat_id]:
-        text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
-
-    await message.answer(text_out)
-
 @router.message(F.text.lower() == "го")
 async def spin_roulette(message: Message):
     import random
@@ -1056,6 +1015,47 @@ async def repeat_bet(callback: CallbackQuery):
     })
 
     await callback.answer("✅ Ставка повторена")
+
+@router.message(F.text.regexp(r"^\d+"))
+async def collect_bets(message: Message):
+
+    text = message.text.lower().split()
+
+    if not text or not text[0].isdigit():
+        return
+
+    bet = int(text[0])
+    items = text[1:]
+
+    if not items:
+        return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    if db.get_balance(user_id) < bet:
+        return await message.answer("❌ Недостаточно средств")
+
+    db.update_balance(user_id, -bet, "Рулетка ставка")
+
+    if chat_id not in roulette_bets:
+        roulette_bets[chat_id] = []
+
+    roulette_bets[chat_id].append({
+        "user": message.from_user.full_name,
+        "user_id": user_id,
+        "bet": bet,
+        "items": items
+    })
+
+    # 🧾 вывод списка ставок
+    text_out = "📊 Ставки:\n\n"
+
+    for b in roulette_bets[chat_id]:
+        text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
+
+    await message.answer(text_out)
+
 
 @router.callback_query(F.data == "double_bet")
 async def double_bet(callback: CallbackQuery):
