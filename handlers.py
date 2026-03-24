@@ -362,26 +362,17 @@ async def transfer_text(message: Message):
 
 @router.message(F.text.lower().startswith("промо"))
 async def promo_text(message: Message):
-    await promo_command(message)
     args = message.text.split()
     if len(args) != 2:
         await message.answer("Использование: промо [код]")
         return
-    code = args[1].strip()
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT reward FROM promocodes WHERE code=? AND used_by IS NULL", (code,))
-    row = c.fetchone()
-    if not row:
-        await message.answer("Неверный или уже использованный промокод.")
-        conn.close()
+    code = args[1].strip().upper()
+    reward, error = db.use_promo(code, message.from_user.id)
+    if error:
+        await message.answer(error)
         return
-    reward = row[0]
-    c.execute("UPDATE promocodes SET used_by=? WHERE code=?", (message.from_user.id, code))
-    conn.commit()
-    conn.close()
-    db.update_balance(message.from_user.id, reward, f"Активация промокода {code}")
     await message.answer(f"🎉 Промокод активирован! Получено +{reward} GALL.")
+
 
 # /games (настройка игр в группе)
 @router.message(Command("games"))
@@ -1194,6 +1185,7 @@ async def admin_panel(callback: CallbackQuery):
         reply_markup=keyboard
     )
 
+
 @router.message(Command("promo"))
 async def create_promo(message: Message):
     if not is_admin(message.from_user.id):
@@ -1213,20 +1205,10 @@ async def create_promo(message: Message):
     if reward <= 0:
         return await message.answer("❌ Сумма должна быть больше 0")
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # проверка на существование
-    c.execute("SELECT code FROM promocodes WHERE code=?", (code,))
-    if c.fetchone():
-        conn.close()
+    try:
+        db.create_promo(code, reward)
+    except Exception:
         return await message.answer("❌ Такой промокод уже существует")
-
-    # создаём промокод
-    c.execute("INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
-              (code, reward))
-    conn.commit()
-    conn.close()
 
     await message.answer(f"✅ Промокод создан!\nКод: {code}\nНаграда: {reward} GALL")
     
@@ -1254,19 +1236,8 @@ async def delete_promo(message: Message):
             "❌ Использование:\n/delpromo КОД\n\nПример:\n/delpromo BONUS100"
         )
 
-    code = args[1].strip()
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # проверка существования
-    c.execute("SELECT code FROM promocodes WHERE code=?", (code,))
-    if not c.fetchone():
-        conn.close()
-        return await message.answer("❌ Промокод не найден")
-
-    # удаление
-    c.execute("DELETE FROM promocodes WHERE code=?", (code,))
-    conn.commit()
-    conn.close()
-
-    await message.answer(f"✅ Промокод {code} удалён")
+    code = args[1].strip().upper()
+    if db.delete_promo(code):
+        await message.answer(f"✅ Промокод {code} удалён")
+    else:
+        await message.answer("❌ Промокод не найден")
