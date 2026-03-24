@@ -348,3 +348,23 @@ def add_donation(user_id: int, stars: int):
     total = gall + int(gall * bonus / 100)
     update_balance(user_id, total, f"Покупка за {stars} Stars")
     return True, total
+
+def get_user_stars(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT stars FROM users WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+def update_user_stars(user_id, amount, reason=""):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE users SET stars = stars + ? WHERE user_id=?", (amount, user_id))
+    # Добавим лог
+    c.execute(
+        "INSERT INTO transactions (user_id, amount, reason, timestamp) VALUES (?, ?, ?, ?)",
+        (user_id, amount, reason, datetime.datetime.now())
+    )
+    conn.commit()
+    conn.close()
