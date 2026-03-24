@@ -903,43 +903,29 @@ async def spin_roulette(message: Message):
         for item in items:
             win = 0
 
-            # 🎯 число
-            if item.isdigit():
-                if int(item) == number:
+    # число
+            if isinstance(item, int):
+                if item == number:
                     win = bet * 36
 
-            # 🎯 диапазон
-            elif "-" in item:
-                try:
-                    start, end = map(int, item.split("-"))
-
-                    numbers = list(range(start, end + 1))
-                    part_bet = bet / len(numbers)  # делим ставку
-
-                    if number in numbers:
-                        win = int(part_bet * 36)
-
-                except:
-                    pass
-
-            # 🎯 чет / нечет
+    # чет / нечет
             elif item == "чет" and number != 0:
                 if number % 2 == 0:
                     win = bet * 2
-
+        
             elif item == "нечет" and number != 0:
                 if number % 2 == 1:
                     win = bet * 2
-
-            # 🎯 цвет
+        
+            # цвет
             elif item in ["к", "красный"]:
                 if color_name == "к":
                     win = bet * 2
-
+        
             elif item in ["ч", "черный"]:
                 if color_name == "ч":
                     win = bet * 2
-
+        
             total_win += win
 
         # 💰 начисление
@@ -1055,16 +1041,28 @@ async def collect_bets(message: Message):
     if not text or not text[0].isdigit():
         return
 
-    # проверка каждого элемента ставки
-    for item in items:
+    bet = int(text[0])
+    raw_items = text[1:]
 
-    # число
+    if not raw_items:
+        return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    numbers = []  # все числа (развернутые)
+
+    # 🔍 обработка ставок
+    for item in raw_items:
+
+        # число
         if item.isdigit():
             num = int(item)
             if num < 0 or num > 36:
                 return await message.answer("❌ Числа только от 0 до 36")
+            numbers.append(num)
 
-    # диапазон
+        # диапазон
         elif "-" in item:
             try:
                 start, end = map(int, item.split("-"))
@@ -1072,43 +1070,48 @@ async def collect_bets(message: Message):
                 if start < 0 or end > 36 or start > end:
                     return await message.answer("❌ Диапазон должен быть от 0 до 36")
 
+                numbers.extend(range(start, end + 1))
+
             except:
                 return await message.answer("❌ Неверный формат диапазона")
 
-    bet = int(text[0])
-    items = text[1:]
-    if not items:
-        return
+        # другие типы (цвет, чет)
+        else:
+            numbers.append(item)
 
-    user_id = message.from_user.id
-    chat_id = message.chat.id
+    # 💰 считаем стоимость
+    total_bet = bet * len(numbers)
 
-    if db.get_balance(user_id) < bet:
-        return await message.answer("❌ Недостаточно средств")
+    if db.get_balance(user_id) < total_bet:
+        return await message.answer(
+            f"❌ Недостаточно средств\n"
+            f"Нужно: {total_bet}\n"
+            f"Баланс: {db.get_balance(user_id)}"
+        )
 
-    db.update_balance(user_id, -bet, "Рулетка ставка")
+    # списываем
+    db.update_balance(user_id, -total_bet, "Рулетка ставка")
 
     roulette_bets.setdefault(chat_id, []).append({
         "user": message.from_user.full_name,
         "user_id": user_id,
         "bet": bet,
-        "items": items
+        "items": numbers  # уже развернутые
     })
 
-    # --- сохраняем последнюю ставку ---
+    # сохраняем
     last_user_bets[user_id] = {
         "chat_id": chat_id,
         "bet": bet,
-        "items": items
+        "items": numbers
     }
 
-    # вывод списка ставок
+    # вывод
     text_out = "📊 Ставки:\n\n"
     for b in roulette_bets[chat_id]:
-        text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
+        text_out += f"{b['user']} — {b['bet']} на {b['items']}\n"
 
     await message.answer(text_out)
-
 
 
 @router.callback_query(F.data == "double_bet")
