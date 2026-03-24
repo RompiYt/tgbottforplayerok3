@@ -10,6 +10,7 @@ import sqlite3
 import asyncio
 from aiogram.types import FSInputFile
 
+from config import DONATION_PLANS
 from config import ADMINS
 from config import *
 import database as db
@@ -192,20 +193,13 @@ async def cat_static(callback: CallbackQuery):
     ]))
     await callback.answer()
 
-@router.message(F.text.lower() == "донат")
+@router.message(lambda message: message.text and message.text.lower().strip() == "донат")
 async def donate_button(message: Message):
     text = (
-        "⭐️ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        "⭐ Пополнение баланса GALL\n"
         "Вы можете мгновенно приобрести валюту через Telegram Stars.\n"
-        "Это самый быстрый и безопасный способ стать богаче в игре!\n\n"
-        "💎 Что дают GALL?\n"
-        "├ Возможность играть по крупным ставкам\n"
-        "├ Создание собственных чеков для друзей\n"
-        "└ Попадание в глобальный топ игроков\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "⬇️ Нажмите кнопку ниже, чтобы перейти к покупке:"
+        "Выбирайте удобный вариант и получайте бонусы!"
     )
-    # Кнопка "Выбрать план"
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         InlineKeyboardButton(text="Купить GALL", callback_data="show_donation_plans")
@@ -214,38 +208,47 @@ async def donate_button(message: Message):
 
 @router.callback_query(F.data == "show_donation_plans")
 async def show_donation_plans(callback: CallbackQuery):
-    keyboard = InlineKeyboardMarkup(row_width=2)
+    text = "💎 Выберите план пополнения:\n\n"
+    keyboard = InlineKeyboardMarkup(row_width=1)
     for stars, info in DONATION_PLANS.items():
-        text = f"⭐ {stars} → +{info['gall']} GALL"
-        if info.get("bonus"):
-            text += f" (+{info['bonus']}% бонус)"
+        bonus_text = f" (+{info['bonus']}% бонус)" if info['bonus'] else ""
+        text += f"⭐ {stars} Stars → +{info['gall']} GALL{bonus_text}\n"
         keyboard.add(
-            InlineKeyboardButton(text=text, callback_data=f"donate_{stars}")
+            InlineKeyboardButton(
+                text=f"{stars} ⭐ → {info['gall']} GALL{bonus_text}",
+                callback_data=f"buy_stars_{stars}"
+            )
         )
-    await callback.message.answer(
-        "💎 Выберите количество звезд для покупки GALL:",
-        reply_markup=keyboard
-    )
+    await callback.message.edit_text(text, reply_markup=keyboard)
     await callback.answer()
 
-@router.callback_query(F.data.regexp(r"^donate_\d+$"))
-async def handle_donate(callback: CallbackQuery):
+@router.callback_query(lambda c: c.data.startswith("buy_stars_"))
+async def buy_stars_plan(callback: CallbackQuery):
     user_id = callback.from_user.id
-    stars = int(callback.data.split("_")[1])
-
+    stars = int(callback.data.split("_")[-1])
     plan = DONATION_PLANS.get(stars)
     if not plan:
-        return await callback.answer("❌ Ошибка плана", show_alert=True)
+        return await callback.answer("❌ План не найден", show_alert=True)
 
-    gall = plan['gall']
-    bonus = plan.get('bonus', 0)
-    total = gall + int(gall * bonus / 100)
+    # Проверяем баланс пользователя (звёзды)
+    user_stars = db.get_user_stars(user_id)  # Надо сделать в базе функцию get_user_stars
+    if user_stars < stars:
+        return await callback.answer(f"❌ У вас недостаточно {stars} ⭐", show_alert=True)
 
-    db.update_balance(user_id, total, f"Покупка за {stars} Stars")
+    # Списываем звёзды
+    db.update_user_stars(user_id, -stars, f"Покупка {plan['gall']} GALL за {stars} ⭐")
+
+    # Начисляем GALL + бонус
+    bonus = int(plan['gall'] * plan['bonus'] / 100)
+    total_gall = plan['gall'] + bonus
+    db.update_balance(user_id, total_gall, f"Покупка GALL за {stars} ⭐")
+
     await callback.message.answer(
-        f"💎 Вы успешно приобрели {total} GALL за {stars} ⭐ Stars!"
+        f"✅ Вы купили {plan['gall']} GALL за {stars} ⭐\n"
+        f"💰 Бонус: {bonus} GALL\n"
+        f"Итого зачислено: {total_gall} GALL"
     )
-    await callback.answer("✅ Донат обработан")
+    await callback.answer("💎 Покупка успешно совершена!")
 
 # Обработчик для кнопки "Пойти играть" после бонуса
 @router.callback_query(F.data == "go_play")
