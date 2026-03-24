@@ -860,8 +860,8 @@ async def spin_roulette(message: Message):
         return await message.answer("❌ Нет ставок")
 
     # 🎰 отправляем гиф
-    gif = FSInputFile("roulette.gif")
-    await message.answer_animation(gif)
+    video = FSInputFile("roulette.gif.mp4")
+    await message.answer_video(video))
 
     # ⏳ задержка
     await asyncio.sleep(5)
