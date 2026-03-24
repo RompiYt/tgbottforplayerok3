@@ -902,13 +902,29 @@ async def spin_roulette(message: Message):
 
         for item in items:
             win = 0
-
-    # число
-            if isinstance(item, int):
-                if item == number:
+        
+            # 🎯 число
+            if item.isdigit():
+                if int(item) == number:
                     win = bet * 36
-
-    # чет / нечет
+        
+            # 🎯 диапазон
+            elif "-" in item:
+                start, end = map(int, item.split("-"))
+        
+                # 🔥 особый случай 0-36
+                if start == 0 and end == 36:
+                    if number >= 0:
+                        win = int(bet * 0.7)
+        
+                else:
+                    numbers = list(range(start, end + 1))
+        
+                    if number in numbers:
+                        coef = 36 / len(numbers)
+                        win = int(bet * coef)
+        
+            # 🎯 чет/нечет
             elif item == "чет" and number != 0:
                 if number % 2 == 0:
                     win = bet * 2
@@ -917,7 +933,7 @@ async def spin_roulette(message: Message):
                 if number % 2 == 1:
                     win = bet * 2
         
-            # цвет
+            # 🎯 цвет
             elif item in ["к", "красный"]:
                 if color_name == "к":
                     win = bet * 2
@@ -925,9 +941,8 @@ async def spin_roulette(message: Message):
             elif item in ["ч", "черный"]:
                 if color_name == "ч":
                     win = bet * 2
-        
-            total_win += win
 
+    total_win += win
         # 💰 начисление
         if total_win > 0:
             db.update_balance(user_id, total_win, "Рулетка выигрыш")
@@ -1038,29 +1053,29 @@ async def cancel_bets(message: Message):
 @router.message(F.text.regexp(r"^\d+"))
 async def collect_bets(message: Message):
     text = message.text.lower().split()
-    if not text or not text[0].isdigit():
+    if len(text) < 2:
         return
 
-    bet = int(text[0])
-    raw_items = text[1:]
-
-    if not raw_items:
+    try:
+        bet = int(text[0])
+    except:
         return
 
+    items = text[1:]
     user_id = message.from_user.id
     chat_id = message.chat.id
 
-    numbers = []  # все числа (развернутые)
+    total_cost = 0
 
-    # 🔍 обработка ставок
-    for item in raw_items:
+    # ✅ проверка ставок
+    for item in items:
 
         # число
         if item.isdigit():
             num = int(item)
             if num < 0 or num > 36:
                 return await message.answer("❌ Числа только от 0 до 36")
-            numbers.append(num)
+            total_cost += bet
 
         # диапазон
         elif "-" in item:
@@ -1070,46 +1085,44 @@ async def collect_bets(message: Message):
                 if start < 0 or end > 36 or start > end:
                     return await message.answer("❌ Диапазон должен быть от 0 до 36")
 
-                numbers.extend(range(start, end + 1))
+                total_cost += bet  # диапазон = 1 ставка
 
             except:
                 return await message.answer("❌ Неверный формат диапазона")
 
-        # другие типы (цвет, чет)
+        # чет/нечет/цвет
+        elif item in ["чет", "нечет", "к", "ч", "красный", "черный"]:
+            total_cost += bet
+
         else:
-            numbers.append(item)
+            return await message.answer(f"❌ Неизвестная ставка: {item}")
 
-    # 💰 считаем стоимость
-    total_bet = bet * len(numbers)
+    # 💸 проверка баланса
+    balance = db.get_balance(user_id)
+    if balance < total_cost:
+        return await message.answer(f"❌ Недостаточно средств\nНужно: {total_cost}")
 
-    if db.get_balance(user_id) < total_bet:
-        return await message.answer(
-            f"❌ Недостаточно средств\n"
-            f"Нужно: {total_bet}\n"
-            f"Баланс: {db.get_balance(user_id)}"
-        )
+    # 💸 списание
+    db.update_balance(user_id, -total_cost, "Рулетка ставка")
 
-    # списываем
-    db.update_balance(user_id, -total_bet, "Рулетка ставка")
-
+    # сохраняем
     roulette_bets.setdefault(chat_id, []).append({
         "user": message.from_user.full_name,
         "user_id": user_id,
         "bet": bet,
-        "items": numbers  # уже развернутые
+        "items": items
     })
 
-    # сохраняем
     last_user_bets[user_id] = {
         "chat_id": chat_id,
         "bet": bet,
-        "items": numbers
+        "items": items
     }
 
-    # вывод
+    # 📊 вывод
     text_out = "📊 Ставки:\n\n"
     for b in roulette_bets[chat_id]:
-        text_out += f"{b['user']} — {b['bet']} на {b['items']}\n"
+        text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
 
     await message.answer(text_out)
 
