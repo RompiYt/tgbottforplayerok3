@@ -9,6 +9,7 @@ from aiogram.enums import ChatMemberStatus
 import sqlite3
 import asyncio
 from aiogram.types import FSInputFile
+from aiogram.types import LabeledPrice
 
 from config import DONATION_PLANS
 from config import ADMINS
@@ -196,59 +197,92 @@ async def cat_static(callback: CallbackQuery):
 @router.message(lambda message: message.text and message.text.lower().strip() == "донат")
 async def donate_button(message: Message):
     text = (
-        "⭐ Пополнение баланса GALL\n"
-        "Вы можете мгновенно приобрести валюту через Telegram Stars.\n"
-        "Выбирайте удобный вариант и получайте бонусы!"
+        "⭐ Пополнение баланса GALL\n\n"
+        "Вы можете приобрести валюту через Telegram Stars.\n"
+        "Нажмите кнопку ниже:"
     )
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton(text="Купить GALL", callback_data="show_donation_plans")
-    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💎 Купить GALL", callback_data="show_donation_plans")]
+    ])
+
     await message.answer(text, reply_markup=keyboard)
 
 @router.callback_query(F.data == "show_donation_plans")
 async def show_donation_plans(callback: CallbackQuery):
-    text = "💎 Выберите план пополнения:\n\n"
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    buttons = []
+
     for stars, info in DONATION_PLANS.items():
-        bonus_text = f" (+{info['bonus']}% бонус)" if info['bonus'] else ""
-        text += f"⭐ {stars} Stars → +{info['gall']} GALL{bonus_text}\n"
-        keyboard.add(
+        text = f"{stars} ⭐ → {info['gall']} GALL"
+        if info['bonus']:
+            text += f" (+{info['bonus']}%)"
+
+        buttons.append([
             InlineKeyboardButton(
-                text=f"{stars} ⭐ → {info['gall']} GALL{bonus_text}",
+                text=text,
                 callback_data=f"buy_stars_{stars}"
             )
-        )
-    await callback.message.edit_text(text, reply_markup=keyboard)
+        ])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    await callback.message.answer(
+        "💎 Выберите пакет:",
+        reply_markup=keyboard
+    )
     await callback.answer()
 
 @router.callback_query(lambda c: c.data.startswith("buy_stars_"))
-async def buy_stars_plan(callback: CallbackQuery):
-    user_id = callback.from_user.id
+async def buy_stars(callback: CallbackQuery):
     stars = int(callback.data.split("_")[-1])
     plan = DONATION_PLANS.get(stars)
+
     if not plan:
-        return await callback.answer("❌ План не найден", show_alert=True)
+        return await callback.answer("❌ Ошибка", show_alert=True)
 
-    # Проверяем баланс пользователя (звёзды)
-    user_stars = db.get_user_stars(user_id)  # Надо сделать в базе функцию get_user_stars
-    if user_stars < stars:
-        return await callback.answer(f"❌ У вас недостаточно {stars} ⭐", show_alert=True)
+    prices = [LabeledPrice(label=f"{plan['gall']} GALL", amount=stars)]
 
-    # Списываем звёзды
-    db.update_user_stars(user_id, -stars, f"Покупка {plan['gall']} GALL за {stars} ⭐")
-
-    # Начисляем GALL + бонус
-    bonus = int(plan['gall'] * plan['bonus'] / 100)
-    total_gall = plan['gall'] + bonus
-    db.update_balance(user_id, total_gall, f"Покупка GALL за {stars} ⭐")
-
-    await callback.message.answer(
-        f"✅ Вы купили {plan['gall']} GALL за {stars} ⭐\n"
-        f"💰 Бонус: {bonus} GALL\n"
-        f"Итого зачислено: {total_gall} GALL"
+    await callback.message.answer_invoice(
+        title="Покупка GALL",
+        description=f"{plan['gall']} GALL (+{plan['bonus']}% бонус)",
+        payload=f"donate_{stars}",
+        provider_token="",  # ⚠️ ПУСТО для Telegram Stars
+        currency="XTR",     # ⭐ ОБЯЗАТЕЛЬНО
+        prices=prices
     )
-    await callback.answer("💎 Покупка успешно совершена!")
+
+    await callback.answer()
+
+@router.pre_checkout_query()
+async def pre_checkout(pre_checkout_query):
+    await pre_checkout.answer(ok=True)
+
+@router.message(F.successful_payment)
+async def successful_payment(message: Message):
+    user_id = message.from_user.id
+    payload = message.successful_payment.invoice_payload
+
+    # получаем stars из payload
+    stars = int(payload.split("_")[1])
+    plan = DONATION_PLANS.get(stars)
+
+    if not plan:
+        return await message.answer("❌ Ошибка начисления")
+
+    gall = plan['gall']
+    bonus = int(gall * plan['bonus'] / 100)
+    total = gall + bonus
+
+    # начисляем валюту
+    db.update_balance(user_id, total, f"Донат {stars}⭐")
+
+    await message.answer(
+        f"💎 Оплата прошла успешно!\n\n"
+        f"⭐ Потрачено: {stars}\n"
+        f"💰 Получено: {gall} GALL\n"
+        f"🎁 Бонус: {bonus}\n"
+        f"🔥 Итого: {total} GALL"
+    )
 
 # Обработчик для кнопки "Пойти играть" после бонуса
 @router.callback_query(F.data == "go_play")
