@@ -3,7 +3,7 @@ import os
 BOT_TOKEN = "8685749642:AAEV_g48v9b8wWBPycQPii3Mq9lvh-2UxKA"
 CHANNEL_LINK = "https://t.me/GallNovosti"
 CHAT_LINK = "https://t.me/+BUL77Ab2R4c0MTZi"
-ADMINS = [8284304240]
+ADMINS = [8284304240, 5080211871]
 
 DONATION_PLANS = {
     10: {"gall": 750000, "bonus": 0},
