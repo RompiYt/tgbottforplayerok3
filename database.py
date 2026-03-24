@@ -42,7 +42,8 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS promocodes (
                     code TEXT PRIMARY KEY,
                     reward INTEGER,
-                    used_by INTEGER
+                    max_uses INTEGER,
+                    uses INTEGER DEFAULT 0
                 )''')
     
     # Настройки групп
@@ -197,27 +198,39 @@ def use_check(code, user_id):
 # -------------------------
 # Промокоды
 # -------------------------
-def create_promo(code: str, reward: int):
+def create_promo(code: str, reward: int, max_uses: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
-              (code.upper(), reward))
+    c.execute(
+        "INSERT INTO promocodes (code, reward, max_uses, uses) VALUES (?, ?, ?, 0)",
+        (code.upper(), reward, max_uses)
+    )
     conn.commit()
     conn.close()
-
+    
 def use_promo(code: str, user_id: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT reward FROM promocodes WHERE code=? AND used_by IS NULL", (code.upper(),))
+
+    c.execute("SELECT reward, uses, max_uses FROM promocodes WHERE code=?", (code.upper(),))
     row = c.fetchone()
+
     if not row:
         conn.close()
-        return None, "❌ Неверный или уже использованный промокод"
-    reward = row[0]
-    c.execute("UPDATE promocodes SET used_by=? WHERE code=?", (user_id, code.upper()))
+        return None, "❌ Промокод не найден"
+
+    reward, uses, max_uses = row
+
+    if uses >= max_uses:
+        conn.close()
+        return None, "❌ Промокод уже исчерпан"
+
+    # увеличиваем использование
+    c.execute("UPDATE promocodes SET uses = uses + 1 WHERE code=?", (code.upper(),))
     conn.commit()
     conn.close()
-    update_balance(user_id, reward, f"Активация промокода {code.upper()}")
+
+    update_balance(user_id, reward, f"Промокод {code}")
     return reward, None
 
 def delete_promo(code: str):
