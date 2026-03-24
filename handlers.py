@@ -1288,3 +1288,39 @@ async def list_promos(callback: CallbackQuery):
         )
 
     await callback.message.answer(text)
+
+@router.message(Command("take"))
+async def take_balance(message: Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("❌ Нет доступа")
+
+    args = message.text.split()
+    if len(args) != 3:
+        return await message.answer(
+            "❌ Использование:\n/take USER_ID СУММА\n\nПример:\n/take 123456789 500"
+        )
+
+    try:
+        user_id = int(args[1])
+        amount = int(args[2])
+    except:
+        return await message.answer("❌ ID и сумма должны быть числами")
+
+    if amount <= 0:
+        return await message.answer("❌ Сумма должна быть больше 0")
+
+    balance = db.get_balance(user_id)
+
+    if balance <= 0:
+        return await message.answer("❌ У пользователя и так 0")
+
+    # сколько реально можно снять
+    new_amount = min(amount, balance)
+
+    db.update_balance(user_id, -new_amount, f"Снятие админом {message.from_user.id}")
+
+    await message.answer(
+        f"✅ С пользователя {user_id} снято {new_amount} GALL\n"
+        f"💰 Было: {balance}\n"
+        f"💸 Стало: {balance - new_amount}"
+    )
