@@ -854,7 +854,7 @@ async def spin_roulette(message: Message):
     if chat_id not in roulette_bets or not roulette_bets[chat_id]:
         return await message.answer("❌ Нет ставок")
 
-# 🎰 отправляем гиф
+    # 🎰 отправляем гиф
     gif = FSInputFile("roulette.gif")
     msg = await message.answer_animation(gif)
 
@@ -866,13 +866,12 @@ async def spin_roulette(message: Message):
         except:
             pass
 
-# запускаем параллельно
     asyncio.create_task(delete_msg())
 
-# ⏳ ждем 10 сек перед результатом
+    # ⏳ ждем 10 сек
     await asyncio.sleep(10)
 
-# 🎯 результат
+    # 🎯 результат
     number = random.randint(0, 36)
 
     red_numbers = {
@@ -891,65 +890,65 @@ async def spin_roulette(message: Message):
 
     result_text = f"🎰 Рулетка: {number} {color}\n\n"
 
-    # 🎯 обработка всех ставок
-for bet_data in roulette_bets[chat_id]:
-    user = bet_data["user"]
-    user_id = bet_data["user_id"]
-    bet = bet_data["bet"]
-    items = bet_data["items"]
+    # 🎯 ОБРАБОТКА СТАВОК (ВАЖНО: ВНУТРИ ФУНКЦИИ)
+    for bet_data in roulette_bets[chat_id]:
+        user = bet_data["user"]
+        user_id = bet_data["user_id"]
+        bet = bet_data["bet"]
+        items = bet_data["items"]
 
-    total_win = 0
+        total_win = 0
 
-    for item in items:
-        win = 0
+        for item in items:
+            win = 0
 
-        # 🎯 число
-        if item.isdigit():
-            if int(item) == number:
-                win = bet * 36
+            # 🎯 число
+            if item.isdigit():
+                if int(item) == number:
+                    win = bet * 36
 
-        # 🎯 диапазон
-        elif "-" in item:
-            start, end = map(int, item.split("-"))
+            # 🎯 диапазон
+            elif "-" in item:
+                start, end = map(int, item.split("-"))
 
-            # 🔥 0-36
-            if start == 0 and end == 36:
-                win = int(bet * 0.7)
+                # 🔥 0-36 (в минус)
+                if start == 0 and end == 36:
+                    win = int(bet * 0.7)
 
-            else:
-                numbers = list(range(start, end + 1))
-                if number in numbers:
-                    coef = 36 / len(numbers)
-                    win = int(bet * coef)
+                else:
+                    numbers = list(range(start, end + 1))
+                    if number in numbers:
+                        coef = 36 / len(numbers)
+                        win = int(bet * coef)
 
-        # 🎯 чет/нечет
-        elif item == "чет" and number != 0:
-            if number % 2 == 0:
-                win = bet * 2
+            # 🎯 чет/нечет
+            elif item == "чет" and number != 0:
+                if number % 2 == 0:
+                    win = bet * 2
 
-        elif item == "нечет" and number != 0:
-            if number % 2 == 1:
-                win = bet * 2
+            elif item == "нечет" and number != 0:
+                if number % 2 == 1:
+                    win = bet * 2
 
-        # 🎯 цвет
-        elif item in ["к", "красный"]:
-            if color_name == "к":
-                win = bet * 2
+            # 🎯 цвет
+            elif item in ["к", "красный"]:
+                if color_name == "к":
+                    win = bet * 2
 
-        elif item in ["ч", "черный"]:
-            if color_name == "ч":
-                win = bet * 2
+            elif item in ["ч", "черный"]:
+                if color_name == "ч":
+                    win = bet * 2
 
-        total_win += win  # ← ВАЖНО: внутри цикла
+            total_win += win
 
-    # ✅ ВОТ ЭТОТ БЛОК ДОЛЖЕН БЫТЬ НА УРОВЕНЬ ВЫШЕ
-    if total_win > 0:
-        db.update_balance(user_id, total_win, "Рулетка выигрыш")
-        result_text += f"✅ {user} выиграл {total_win}\n"
-    else:
-        result_text += f"❌ {user} проиграл\n"
+        # ✅ ВНЕ внутреннего цикла
+        if total_win > 0:
+            db.update_balance(user_id, total_win, "Рулетка выигрыш")
+            result_text += f"✅ {user} выиграл {total_win}\n"
+        else:
+            result_text += f"❌ {user} проиграл\n"
 
-    # 📊 сохраняем лог
+    # 📊 лог
     if chat_id not in roulette_history:
         roulette_history[chat_id] = []
 
