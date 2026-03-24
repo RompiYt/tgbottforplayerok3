@@ -200,28 +200,52 @@ def use_check(code, user_id):
 def create_promo(code: str, reward: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
-        (code.upper(), reward)
-    )
+    c.execute("INSERT INTO promocodes (code, reward, used_by) VALUES (?, ?, NULL)",
+              (code.upper(), reward))
     conn.commit()
     conn.close()
 
-def use_promo(code, user_id):
+def use_promo(code: str, user_id: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT reward FROM promocodes WHERE code=? AND used_by IS NULL", (code,))
+    c.execute("SELECT reward FROM promocodes WHERE code=? AND used_by IS NULL", (code.upper(),))
     row = c.fetchone()
     if not row:
         conn.close()
-        return None, "Неверный или уже использованный промокод"
+        return None, "❌ Неверный или уже использованный промокод"
     reward = row[0]
-    c.execute("UPDATE promocodes SET used_by=? WHERE code=?", (user_id, code))
+    c.execute("UPDATE promocodes SET used_by=? WHERE code=?", (user_id, code.upper()))
     conn.commit()
     conn.close()
-    update_balance(user_id, reward, f"Промокод {code}")
+    update_balance(user_id, reward, f"Активация промокода {code.upper()}")
     return reward, None
 
+def delete_promo(code: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT code FROM promocodes WHERE code=?", (code.upper(),))
+    if not c.fetchone():
+        conn.close()
+        return False
+    c.execute("DELETE FROM promocodes WHERE code=?", (code.upper(),))
+    conn.commit()
+    conn.close()
+    return True
+
+def update_balance(user_id: int, amount: int, reason: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    if not row:
+        # создаем пользователя, если его ещё нет в базе
+        c.execute("INSERT INTO users (user_id, balance) VALUES (?, ?)", (user_id, amount))
+    else:
+        # если пользователь есть, прибавляем сумму к его балансу
+        new_balance = row[0] + amount
+        c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
+    conn.commit()
+    conn.close()
 
 # -------------------------
 # Топ пользователей
