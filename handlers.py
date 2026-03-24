@@ -13,6 +13,11 @@ from config import *
 import database as db
 import keyboards as kb
 
+roulette_bets = {}  # chat_id: [ставки]
+last_spin_time = {}  # chat_id: timestamp
+roulette_history = {}  # chat_id: [результаты]
+last_user_bets = {}  # user_id: (chat_id, bet_data)
+
 router = Router()
 
 @router.message(CommandStart())
@@ -834,13 +839,173 @@ async def football_modes(message: Message):
     )
     
 
-@router.callback_query(F.data == "game_roulette")
-async def game_roulette(callback: CallbackQuery):
-    await callback.answer("Рулетка в разработке!", show_alert=True)
+@router.message()
+async def collect_bets(message: Message):
+    import time
 
-@router.callback_query(F.data == "game_mines")
-async def game_mines(callback: CallbackQuery):
-    await callback.answer("Мины в разработке!", show_alert=True)
+    text = message.text.lower().split()
+
+    if not text or not text[0].isdigit():
+        return
+
+    bet = int(text[0])
+    items = text[1:]
+
+    if not items:
+        return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    if db.get_balance(user_id) < bet:
+        return await message.answer("❌ Недостаточно средств")
+
+    db.update_balance(user_id, -bet, "Рулетка ставка")
+
+    if chat_id not in roulette_bets:
+        roulette_bets[chat_id] = []
+
+    roulette_bets[chat_id].append({
+        "user": message.from_user.full_name,
+        "user_id": user_id,
+        "bet": bet,
+        "items": items
+    })
+
+    # 🧾 вывод списка ставок
+    text_out = "📊 Ставки:\n\n"
+
+    for b in roulette_bets[chat_id]:
+        text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
+
+    await message.answer(text_out)
+
+@router.message(F.text.lower() == "го")
+async def spin_roulette(message: Message):
+    import random
+    import asyncio
+    import time
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    chat_id = message.chat.id
+
+    # ⏱ анти-спам (20 сек)
+    now = time.time()
+    if chat_id in last_spin_time and now - last_spin_time[chat_id] < 20:
+        return await message.answer("⏳ Подожди немного перед следующим спином")
+
+    last_spin_time[chat_id] = now
+
+    # ❌ нет ставок
+    if chat_id not in roulette_bets or not roulette_bets[chat_id]:
+        return await message.answer("❌ Нет ставок")
+
+    # 🎰 отправляем гиф
+    await message.answer_animation(
+        "https://media.tenor.com/3x63SNWz2WcAAAAC/roulette.gif"
+    )
+
+    # ⏳ задержка
+    await asyncio.sleep(5)
+
+    # 🎯 результат
+    number = random.randint(0, 36)
+
+    red_numbers = {
+        1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36
+    }
+
+    if number == 0:
+        color = "🟢"
+        color_name = "zero"
+    elif number in red_numbers:
+        color = "🔴"
+        color_name = "к"
+    else:
+        color = "⚫"
+        color_name = "ч"
+
+    result_text = f"🎰 Рулетка: {number} {color}\n\n"
+
+    # 🎯 обработка всех ставок
+    for bet_data in roulette_bets[chat_id]:
+        user = bet_data["user"]
+        user_id = bet_data["user_id"]
+        bet = bet_data["bet"]
+        items = bet_data["items"]
+
+        total_win = 0
+
+        for item in items:
+            win = 0
+
+            # 🎯 число
+            if item.isdigit():
+                if int(item) == number:
+                    win = bet * 36
+
+            # 🎯 диапазон
+            elif "-" in item:
+                try:
+                    start, end = map(int, item.split("-"))
+                    if start <= number <= end:
+                        count = end - start + 1
+                        coef = 36 / count
+                        win = int(bet * coef)
+                except:
+                    pass
+
+            # 🎯 чет / нечет
+            elif item == "чет" and number != 0:
+                if number % 2 == 0:
+                    win = bet * 2
+
+            elif item == "нечет" and number != 0:
+                if number % 2 == 1:
+                    win = bet * 2
+
+            # 🎯 цвет
+            elif item in ["к", "красный"]:
+                if color_name == "к":
+                    win = bet * 2
+
+            elif item in ["ч", "черный"]:
+                if color_name == "ч":
+                    win = bet * 2
+
+            total_win += win
+
+        # 💰 начисление
+        if total_win > 0:
+            db.update_balance(user_id, total_win, "Рулетка выигрыш")
+            result_text += f"✅ {user} выиграл {total_win}\n"
+        else:
+            result_text += f"❌ {user} проиграл\n"
+
+    # 📊 сохраняем лог
+    if chat_id not in roulette_history:
+        roulette_history[chat_id] = []
+
+    roulette_history[chat_id].append({
+        "number": number,
+        "color": color
+    })
+
+    roulette_history[chat_id] = roulette_history[chat_id][-7:]
+
+    # 🔘 кнопки
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔁 Повторить", callback_data="repeat_bet"),
+            InlineKeyboardButton(text="💥 Удвоить", callback_data="double_bet")
+        ]
+    ])
+
+    # 🎰 итог
+    await message.answer(result_text, reply_markup=keyboard)
+
+    # 🧹 очистка ставок
+    roulette_bets[chat_id] = []
 
 @router.message(F.text.lower() == "реф")
 async def ref_link(message: Message):
@@ -851,3 +1016,74 @@ async def ref_link(message: Message):
         f"🔗 Ваша реферальная ссылка:\n{link}\n\n"
         "👥 Приглашай друзей и получай GALL!"
     )
+
+@router.message(F.text.lower() == "лог")
+async def roulette_log(message: Message):
+    chat_id = message.chat.id
+
+    if chat_id not in roulette_history or not roulette_history[chat_id]:
+        return await message.answer("❌ Пока нет результатов")
+
+    text = "📊 Последние результаты:\n\n"
+
+    for item in reversed(roulette_history[chat_id]):
+        text += f"{item['number']} {item['color']}\n"
+
+    await message.answer(text)
+
+@router.callback_query(F.data == "repeat_bet")
+async def repeat_bet(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id not in last_user_bets:
+        return await callback.answer("❌ Нет предыдущей ставки", show_alert=True)
+
+    data = last_user_bets[user_id]
+
+    chat_id = data["chat_id"]
+    bet = data["bet"]
+    items = data["items"]
+
+    if db.get_balance(user_id) < bet:
+        return await callback.answer("❌ Недостаточно средств", show_alert=True)
+
+    db.update_balance(user_id, -bet, "Рулетка повтор")
+
+    roulette_bets.setdefault(chat_id, []).append({
+        "user": callback.from_user.full_name,
+        "user_id": user_id,
+        "bet": bet,
+        "items": items
+    })
+
+    await callback.answer("✅ Ставка повторена")
+
+@router.callback_query(F.data == "double_bet")
+async def double_bet(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id not in last_user_bets:
+        return await callback.answer("❌ Нет предыдущей ставки", show_alert=True)
+
+    data = last_user_bets[user_id]
+
+    chat_id = data["chat_id"]
+    bet = data["bet"] * 2
+    items = data["items"]
+
+    if db.get_balance(user_id) < bet:
+        return await callback.answer("❌ Недостаточно средств", show_alert=True)
+
+    db.update_balance(user_id, -bet, "Рулетка удвоение")
+
+    roulette_bets.setdefault(chat_id, []).append({
+        "user": callback.from_user.full_name,
+        "user_id": user_id,
+        "bet": bet,
+        "items": items
+    })
+
+    # обновляем сохранённую ставку
+    last_user_bets[user_id]["bet"] = bet
+
+    await callback.answer("💥 Ставка удвоена")
