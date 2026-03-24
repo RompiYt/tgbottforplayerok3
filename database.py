@@ -270,20 +270,6 @@ def delete_promo(code: str):
     conn.close()
     return True
 
-def update_balance(user_id: int, amount: int, reason: str):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    if not row:
-        # создаем пользователя, если его ещё нет в базе
-        c.execute("INSERT INTO users (user_id, balance) VALUES (?, ?)", (user_id, amount))
-    else:
-        # если пользователь есть, прибавляем сумму к его балансу
-        new_balance = row[0] + amount
-        c.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
-    conn.commit()
-    conn.close()
 
 # -------------------------
 # Топ пользователей
