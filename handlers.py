@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ChatMemberStatus
 import sqlite3
 import asyncio
+from aiogram.types import FSInputFile
 
 from config import *
 import database as db
@@ -859,9 +860,8 @@ async def spin_roulette(message: Message):
         return await message.answer("❌ Нет ставок")
 
     # 🎰 отправляем гиф
-    await message.answer_animation(
-        "https://media.tenor.com/3x63SNWz2WcAAAAC/roulette.gif"
-    )
+    gif = FSInputFile("roulette.gif")
+    await message.answer_animation(gif)
 
     # ⏳ задержка
     await asyncio.sleep(5)
@@ -985,7 +985,7 @@ async def roulette_log(message: Message):
     text = "📊 Последние результаты:\n\n"
 
     for item in reversed(roulette_history[chat_id]):
-        text += f"{item['number']} {item['color']}\n"
+        text += f"{item['color']} {item['number']}  "
 
     await message.answer(text)
 
