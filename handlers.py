@@ -282,7 +282,11 @@ async def successful_payment(message: Message):
         f"💰 Получено: {gall} GALL\n"
         f"🎁 Бонус: {bonus}\n"
         f"🔥 Итого: {total} GALL"
-    )
+        f"🔥 Хочешь x5 к своему донату?\n
+Есть способ получить ГОРАЗДО больше GALL за те же деньги 😏\n
+Напиши @Ghalaken — он расскажет, как задонатить выгодно.\n
+⚡️ Быстро. Просто. Профитно."
+                    )
 
 # Обработчик для кнопки "Пойти играть" после бонуса
 @router.callback_query(F.data == "go_play")
