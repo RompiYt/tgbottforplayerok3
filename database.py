@@ -337,3 +337,14 @@ def add_invite(user_id, inviter_id):
     conn.commit()
     conn.close()
     return True
+
+# Добавить пользователю GALL за донат
+def add_donation(user_id: int, stars: int):
+    plan = DONATION_PLANS.get(stars)
+    if not plan:
+        return False, "❌ Неверное количество звезд"
+    gall = plan['gall']
+    bonus = plan.get('bonus', 0)
+    total = gall + int(gall * bonus / 100)
+    update_balance(user_id, total, f"Покупка за {stars} Stars")
+    return True, total
