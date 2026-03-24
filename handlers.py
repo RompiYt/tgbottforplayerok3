@@ -75,7 +75,7 @@ async def balance_short(message: Message):
     balance = db.get_balance(message.from_user.id)
     await message.answer(f"💰 Ваш баланс: {balance} GALL")
     
-@router.message(F.text == "чаты")
+@router.message(F.text.lower() == "чаты")
 async def chats_button(message: Message):
     await message.answer(
         "🔗 Наши официальные ресурсы\n━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -88,7 +88,7 @@ async def chats_button(message: Message):
         ])
     )
 
-@router.message(F.text == "бонус")
+@router.message(F.text.lower() == "бонус")
 async def bonus_button(message: Message):
     user_id = message.from_user.id
     last = db.get_last_bonus(user_id)
@@ -110,7 +110,7 @@ async def bonus_button(message: Message):
             ])
         )
 
-@router.message(F.text == "профиль")
+@router.message(F.text.lower() == "профиль")
 async def profile_button(message: Message):
     user = db.get_user(message.from_user.id)
     if user:
@@ -124,7 +124,7 @@ async def profile_button(message: Message):
     else:
         await message.answer("Профиль не найден. Напишите /start.")
 
-@router.message(F.text == "команды")
+@router.message(F.text.lower() == "команды")
 async def commands_button(message: Message):
     await message.answer(
         "💎 Полный список команд HARD\n\n"
@@ -145,7 +145,7 @@ async def commands_button(message: Message):
         "└ реф - реферальная ссылка"
     )
 
-@router.message(F.text == "игры")
+@router.message(F.text.lower() == "игры")
 async def games_button(message: Message):
     await message.answer(
         "🎰 Игровой зал GALL\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -192,7 +192,7 @@ async def cat_static(callback: CallbackQuery):
     ]))
     await callback.answer()
 
-@router.message(F.text == "донат")
+@router.message(F.text.lower() == "донат")
 async def donate_button(message: Message):
     text = (
         "⭐ Пополнение баланса GALL\n━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -502,7 +502,7 @@ async def set_reward_command(message: Message):
         await message.answer("Неверная сумма.")
 
 
-@router.message(F.text.startswith("кубик"))
+@router.message(F.text.lower().startswith("кубик"))
 async def dice_modes(message: Message):
 
     args = message.text.lower().split()
@@ -619,7 +619,7 @@ async def dice_modes(message: Message):
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
-@router.message(F.text.startswith("дартс"))
+@router.message(F.text.lower().startswith("дартс"))
 async def darts_modes(message: Message):
 
     args = message.text.lower().split()
@@ -694,7 +694,7 @@ async def darts_modes(message: Message):
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
-@router.message(F.text.startswith("баскет"))
+@router.message(F.text.lower().startswith("баскет"))
 async def basket_modes(message: Message):
 
     args = message.text.lower().split()
@@ -770,7 +770,7 @@ async def basket_modes(message: Message):
         f"{'✅ Выигрыш: ' + str(win) if win else '❌ Проигрыш'}"
     )
 
-@router.message(F.text.startswith("футбол"))
+@router.message(F.text.lower().startswith("футбол"))
 async def football_modes(message: Message):
     args = message.text.lower().split()
 
@@ -1211,6 +1211,19 @@ async def create_promo(message: Message):
         return await message.answer("❌ Такой промокод уже существует")
 
     await message.answer(f"✅ Промокод создан!\nКод: {code}\nНаграда: {reward} GALL")
+
+@router.callback_query(F.data == "create_promo")
+async def create_promo_info(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
+
+    await callback.message.answer(
+        "🎟 Создание промокода\n\n"
+        "Введите команду:\n"
+        "/promo КОД СУММА\n\n"
+        "Пример:\n"
+        "/promo BONUS 1000"
+    )
     
 @router.callback_query(F.data == "delete_promo")
 async def delete_promo_info(callback: CallbackQuery):
