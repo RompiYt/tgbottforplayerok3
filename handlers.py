@@ -859,23 +859,25 @@ async def spin_roulette(message: Message):
     if chat_id not in roulette_bets or not roulette_bets[chat_id]:
         return await message.answer("❌ Нет ставок")
 
-    # 🎰 отправляем гиф
+# 🎰 отправляем гиф
     gif = FSInputFile("roulette.gif")
     msg = await message.answer_animation(gif)
 
+    # ⏳ удаление гифки через 8 сек
     async def delete_msg():
-    await asyncio.sleep(8)
-    try:
-        await msg.delete()
-    except:
-        pass
+        await asyncio.sleep(8)
+        try:
+            await msg.delete()
+        except:
+            pass
 
-asyncio.create_task(delete_msg())
+# запускаем параллельно
+    asyncio.create_task(delete_msg())
 
-    # ⏳ задержка
+# ⏳ ждем 10 сек перед результатом
     await asyncio.sleep(10)
 
-    # 🎯 результат
+# 🎯 результат
     number = random.randint(0, 36)
 
     red_numbers = {
