@@ -1008,7 +1008,6 @@ async def repeat_bet(callback: CallbackQuery):
         return await callback.answer("❌ Нет предыдущей ставки", show_alert=True)
 
     data = last_user_bets[user_id]
-
     chat_id = data["chat_id"]
     bet = data["bet"]
     items = data["items"]
@@ -1027,17 +1026,35 @@ async def repeat_bet(callback: CallbackQuery):
 
     await callback.answer("✅ Ставка повторена")
 
+    await callback.answer("✅ Ставка повторена")
+
+@router.message(F.text.lower() == "отмена")
+async def cancel_bets(message: Message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    if chat_id not in roulette_bets or not roulette_bets[chat_id]:
+        return await message.answer("❌ У вас нет активных ставок")
+
+    # Убираем все ставки данного пользователя
+    roulette_bets[chat_id] = [
+        b for b in roulette_bets[chat_id] if b["user_id"] != user_id
+    ]
+
+    # Убираем из последней ставки
+    if user_id in last_user_bets:
+        del last_user_bets[user_id]
+
+    await message.answer("🧹 Все ваши ставки отменены")
+
 @router.message(F.text.regexp(r"^\d+"))
 async def collect_bets(message: Message):
-
     text = message.text.lower().split()
-
     if not text or not text[0].isdigit():
         return
 
     bet = int(text[0])
     items = text[1:]
-
     if not items:
         return
 
@@ -1049,23 +1066,27 @@ async def collect_bets(message: Message):
 
     db.update_balance(user_id, -bet, "Рулетка ставка")
 
-    if chat_id not in roulette_bets:
-        roulette_bets[chat_id] = []
-
-    roulette_bets[chat_id].append({
+    roulette_bets.setdefault(chat_id, []).append({
         "user": message.from_user.full_name,
         "user_id": user_id,
         "bet": bet,
         "items": items
     })
 
-    # 🧾 вывод списка ставок
-    text_out = "📊 Ставки:\n\n"
+    # --- сохраняем последнюю ставку ---
+    last_user_bets[user_id] = {
+        "chat_id": chat_id,
+        "bet": bet,
+        "items": items
+    }
 
+    # вывод списка ставок
+    text_out = "📊 Ставки:\n\n"
     for b in roulette_bets[chat_id]:
         text_out += f"{b['user']} — {b['bet']} на {' '.join(b['items'])}\n"
 
     await message.answer(text_out)
+
 
 
 @router.callback_query(F.data == "double_bet")
@@ -1076,7 +1097,6 @@ async def double_bet(callback: CallbackQuery):
         return await callback.answer("❌ Нет предыдущей ставки", show_alert=True)
 
     data = last_user_bets[user_id]
-
     chat_id = data["chat_id"]
     bet = data["bet"] * 2
     items = data["items"]
@@ -1093,7 +1113,7 @@ async def double_bet(callback: CallbackQuery):
         "items": items
     })
 
-    # обновляем сохранённую ставку
+    # --- обновляем последнюю ставку ---
     last_user_bets[user_id]["bet"] = bet
 
     await callback.answer("💥 Ставка удвоена")
