@@ -405,7 +405,6 @@ async def games_config(message: Message):
 
 @router.message(F.text.lower().startswith("казна"))
 async def treasury_text(message: Message):
-    await treasury_info(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -419,7 +418,6 @@ async def treasury_text(message: Message):
 
 @router.message(F.text.lower().startswith("награда"))
 async def reward_text(message: Message):
-    await give_reward(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -453,7 +451,6 @@ async def reward_text(message: Message):
 
 @router.message(F.text.lower().startswith("депозит"))
 async def deposit_text(message: Message):
-    await deposit_treasury(message)
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
@@ -1012,10 +1009,16 @@ async def repeat_bet(callback: CallbackQuery):
     bet = data["bet"]
     items = data["items"]
 
-    if db.get_balance(user_id) < bet:
+    # ❗ считаем полную сумму
+    total_bet = bet * len(items)
+
+    balance = db.get_balance(user_id)
+
+    if balance < total_bet:
         return await callback.answer("❌ Недостаточно средств", show_alert=True)
 
-    db.update_balance(user_id, -bet, "Рулетка повтор")
+    # ❗ списываем всю сумму
+    db.update_balance(user_id, -total_bet, "Рулетка повтор")
 
     roulette_bets.setdefault(chat_id, []).append({
         "user": callback.from_user.full_name,
@@ -1024,8 +1027,10 @@ async def repeat_bet(callback: CallbackQuery):
         "items": items
     })
 
-    # Отправляем сообщение о повторе
-    await callback.message.answer(f"🔁 Ставка повторена: {bet} на {' '.join(items)}")
+    await callback.message.answer(
+        f"🔁 Ставка повторена: {bet} на {' '.join(items)}\n"
+        f"💸 Списано: {total_bet}"
+    )
 
     await callback.answer("✅ Ставка повторена")
 
@@ -1150,26 +1155,36 @@ async def double_bet(callback: CallbackQuery):
 
     data = last_user_bets[user_id]
     chat_id = data["chat_id"]
-    bet = data["bet"] * 2  # удвоение
     items = data["items"]
 
-    if db.get_balance(user_id) < bet:
+    old_bet = data["bet"]
+    new_bet = old_bet * 2  # удвоение
+
+    # ❗ учитываем количество ставок
+    total_bet = new_bet * len(items)
+
+    balance = db.get_balance(user_id)
+
+    if balance < total_bet:
         return await callback.answer("❌ Недостаточно средств", show_alert=True)
 
-    db.update_balance(user_id, -bet, "Рулетка удвоение")
+    # ❗ списываем ПОЛНУЮ сумму
+    db.update_balance(user_id, -total_bet, "Рулетка удвоение")
 
     roulette_bets.setdefault(chat_id, []).append({
         "user": callback.from_user.full_name,
         "user_id": user_id,
-        "bet": bet,
+        "bet": new_bet,
         "items": items
     })
 
     # обновляем сохранённую ставку
-    last_user_bets[user_id]["bet"] = bet
+    last_user_bets[user_id]["bet"] = new_bet
 
-    # Отправляем сообщение о новой ставке
-    await callback.message.answer(f"💥 Ставка удвоена: {bet} на {' '.join(items)}")
+    await callback.message.answer(
+        f"💥 Ставка удвоена: {new_bet} на {' '.join(items)}\n"
+        f"💸 Списано: {total_bet}"
+    )
 
     await callback.answer("💥 Ставка удвоена")
 
