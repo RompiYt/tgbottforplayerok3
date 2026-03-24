@@ -996,7 +996,7 @@ async def roulette_log(message: Message):
     text = "📊 Последние результаты:\n\n"
 
     for item in reversed(roulette_history[chat_id]):
-        text += f"{item['color']} {item['number']}  "
+        text += f"{item['color']} {item['number']}\n"  # столбик
 
     await message.answer(text)
 
@@ -1024,7 +1024,8 @@ async def repeat_bet(callback: CallbackQuery):
         "items": items
     })
 
-    await callback.answer("✅ Ставка повторена")
+    # Отправляем сообщение о повторе
+    await callback.message.answer(f"🔁 Ставка повторена: {bet} на {' '.join(items)}")
 
     await callback.answer("✅ Ставка повторена")
 
@@ -1033,19 +1034,22 @@ async def cancel_bets(message: Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
 
-    if chat_id not in roulette_bets or not roulette_bets[chat_id]:
-        return await message.answer("❌ У вас нет активных ставок")
+    if chat_id not in roulette_bets:
+        return await message.answer("❌ Нет ставок в этом чате")
 
-    # Убираем все ставки данного пользователя
-    roulette_bets[chat_id] = [
-        b for b in roulette_bets[chat_id] if b["user_id"] != user_id
-    ]
+    user_bets = [b for b in roulette_bets[chat_id] if b["user_id"] == user_id]
 
-    # Убираем из последней ставки
-    if user_id in last_user_bets:
-        del last_user_bets[user_id]
+    if not user_bets:
+        return await message.answer("❌ У вас нет ставок для отмены")
 
-    await message.answer("🧹 Все ваши ставки отменены")
+    # Возврат денег
+    for b in user_bets:
+        db.update_balance(user_id, b["bet"], "Отмена ставки")
+
+    # Удаляем ставки пользователя
+    roulette_bets[chat_id] = [b for b in roulette_bets[chat_id] if b["user_id"] != user_id]
+
+    await message.answer(f"💸 Все ваши ставки отменены, {len(user_bets)} ставка(ок) возвращены на баланс")
 
 @router.message(F.text.regexp(r"^\d+"))
 async def collect_bets(message: Message):
@@ -1098,7 +1102,7 @@ async def double_bet(callback: CallbackQuery):
 
     data = last_user_bets[user_id]
     chat_id = data["chat_id"]
-    bet = data["bet"] * 2
+    bet = data["bet"] * 2  # удвоение
     items = data["items"]
 
     if db.get_balance(user_id) < bet:
@@ -1113,7 +1117,10 @@ async def double_bet(callback: CallbackQuery):
         "items": items
     })
 
-    # --- обновляем последнюю ставку ---
+    # обновляем сохранённую ставку
     last_user_bets[user_id]["bet"] = bet
+
+    # Отправляем сообщение о новой ставке
+    await callback.message.answer(f"💥 Ставка удвоена: {bet} на {' '.join(items)}")
 
     await callback.answer("💥 Ставка удвоена")
