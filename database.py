@@ -233,6 +233,14 @@ def use_promo(code: str, user_id: int):
     update_balance(user_id, reward, f"Промокод {code}")
     return reward, None
 
+def get_all_promos():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT code, reward, uses, max_uses FROM promocodes")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
 def delete_promo(code: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
