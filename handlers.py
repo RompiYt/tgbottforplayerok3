@@ -916,8 +916,8 @@ async def spin_roulette(message: Message):
                     numbers = list(range(start, end + 1))
                     part_bet = bet / len(numbers)  # делим ставку
 
-                if number in numbers:
-                    win = int(part_bet * 36)
+                    if number in numbers:
+                        win = int(part_bet * 36)
 
                 except:
                     pass
