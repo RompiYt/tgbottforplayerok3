@@ -197,9 +197,11 @@ async def cat_static(callback: CallbackQuery):
 @router.message(lambda message: message.text and message.text.lower().strip() == "донат")
 async def donate_button(message: Message):
     text = (
-        "⭐ Пополнение баланса GALL\n\n"
-        "Вы можете приобрести валюту через Telegram Stars.\n"
-        "Нажмите кнопку ниже:"
+        "🔥 Хочешь x5 к своему донату?\n"
+        "Есть способ получить ГОРАЗДО больше GALL за те же деньги 😏\n"
+        "Напиши @Ghalaken — он расскажет, как задонатить выгодно.\n"
+        "⚡️ Быстро. Просто. Профитно."
+        "Чтобы пополнить баланс GALL через Telegram Stars нажмите кнопку ниже:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -282,10 +284,6 @@ async def successful_payment(message: Message):
         f"💰 Получено: {gall} GALL\n"
         f"🎁 Бонус: {bonus}\n"
         f"🔥 Итого: {total} GALL\n\n"
-        "🔥 Хочешь x5 к своему донату?\n"
-        "Есть способ получить ГОРАЗДО больше GALL за те же деньги 😏\n"
-        "Напиши @Ghalaken — он расскажет, как задонатить выгодно.\n"
-        "⚡️ Быстро. Просто. Профитно."
     )
 
 # Обработчик для кнопки "Пойти играть" после бонуса
