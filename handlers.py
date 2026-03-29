@@ -730,16 +730,16 @@ async def darts_modes(message: Message):
     else:
         result = "❌ МИМО"
 
-    # 🎯 ОБЫЧНЫЙ РЕЖИМ
+    # 🎯 ОБЫЧНЫЙ РЕЖИМ (НОВАЯ ЛОГИКА)
     if mode == "обычный":
         if value == 6:
             win = bet * 3
         elif value >= 4:
             win = bet * 2
 
-    # 🎯 СТАРЫЕ РЕЖИМЫ
+    # 🎯 СТАРЫЕ РЕЖИМЫ (ПОДОГНАНЫ ПОД НОВУЮ ЛОГИКУ)
     elif mode == "центр" and value == 6:
-        win = bet * 2
+        win = bet * 3
 
     elif mode == "мимо" and value <= 2:
         win = bet * 2
@@ -870,7 +870,7 @@ async def football_modes(message: Message):
 
     win = 0
 
-    # ЛОГИКА
+    # ЛОГИКА (ЧЕТКО РАЗДЕЛИЛИ VALUE)
     if value == 6:
         result = "🔥 ДЕВЯТКА"
         if mode == "девятка":
@@ -880,7 +880,7 @@ async def football_modes(message: Message):
         elif mode == "любой":
             win = int(bet * 1.5)
 
-    elif value >= 4:
+    elif value == 4 or value == 5:
         result = "⚽ ГОЛ"
         if mode in ["гол", "любой"]:
             win = bet * 2 if mode == "гол" else int(bet * 1.5)
