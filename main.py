@@ -7,11 +7,20 @@ import handlers as handlers
 
 async def main():
     db.init_db()
-    bot = Bot(token=BOT_TOKEN)
+
+    bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
     dp = Dispatcher()
+
     dp.include_router(handlers.router)
-    await dp.start_polling(bot)
+
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    )
     asyncio.run(main())
