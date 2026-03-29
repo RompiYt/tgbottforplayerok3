@@ -6,10 +6,10 @@ from aiogram.fsm.state import State, StatesGroup
 import datetime
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ChatMemberStatus
-import sqlite3
 import asyncio
 from aiogram.types import FSInputFile
 from aiogram.types import LabeledPrice
+import psycopg2
 
 from config import DONATION_PLANS
 from config import ADMINS
@@ -337,24 +337,23 @@ async def game_command(message: Message):
     # Перенаправляем в игровой зал
     await games_button(message)
 
-# /history
 @router.message(F.text.lower() == "история")
 async def history_text(message: Message):
-    await history_command(message)
     user_id = message.from_user.id
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT amount, reason, timestamp FROM transactions WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (user_id,))
-    rows = c.fetchall()
-    conn.close()
+
+    rows = db.get_user_history(user_id, 10)
+
     if not rows:
         await message.answer("История пуста.")
         return
+
     text = "📜 Последние операции:\n\n"
+
     for amount, reason, ts in rows:
         sign = "+" if amount > 0 else ""
-        text += f"{ts[:19]} | {sign}{amount} GALL | {reason}\n"
-    await message.answer(text[:4000])  # ограничение Telegram
+        text += f"{str(ts)[:19]} | {sign}{amount} GALL | {reason}\n"
+
+    await message.answer(text[:4000])# ограничение Telegram
 
 # /top
 @router.message(lambda message: message.text and message.text.lower() == "топ")
@@ -448,23 +447,39 @@ async def games_config(message: Message):
     if message.chat.type == "private":
         await message.answer("Эта команда работает только в группах.")
         return
-    # Проверка прав админа
+
+    # проверка админа
     member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
     if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
         await message.answer("Только администраторы могут настраивать игры.")
         return
-    conn = sqlite3.connect(DB_PATH)
+
+    conn = db.get_conn()
     c = conn.cursor()
-    c.execute("SELECT games_enabled FROM groups WHERE group_id=?", (message.chat.id,))
+
+    # получаем текущее состояние
+    c.execute(
+        "SELECT games_enabled FROM groups WHERE group_id=%s",
+        (message.chat.id,)
+    )
     row = c.fetchone()
+
     if row:
-        new_state = 1 - row[0]
-        c.execute("UPDATE groups SET games_enabled=? WHERE group_id=?", (new_state, message.chat.id))
+        new_state = 1 - row[0]  # переключаем 1↔0
+        c.execute(
+            "UPDATE groups SET games_enabled=%s WHERE group_id=%s",
+            (new_state, message.chat.id)
+        )
     else:
         new_state = 0
-        c.execute("INSERT INTO groups (group_id, games_enabled) VALUES (?, ?)", (message.chat.id, new_state))
+        c.execute(
+            "INSERT INTO groups (group_id, games_enabled) VALUES (%s, %s)",
+            (message.chat.id, new_state)
+        )
+
     conn.commit()
     conn.close()
+
     status = "включены" if new_state else "отключены"
     await message.answer(f"Игры в группе {status}.")
 
