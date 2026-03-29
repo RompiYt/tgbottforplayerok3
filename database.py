@@ -1,43 +1,54 @@
-import sqlite3
+import psycopg2
 import datetime
 import random
 import string
 
-DB_PATH = "bot.db"
+DB_CONFIG = {
+    "dbname": "your_db",
+    "user": "your_user",
+    "password": "your_password",
+    "host": "localhost",
+    "port": "5432"
+}
+
+def get_conn():
+    return psycopg2.connect(**DB_CONFIG)
+
 
 # -------------------------
 # Инициализация базы данных
 # -------------------------
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    
+
     # Пользователи
     c.execute('''CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER PRIMARY KEY,
+                    user_id BIGINT PRIMARY KEY,
                     username TEXT,
                     balance INTEGER DEFAULT 0,
-                    last_bonus TIMESTAMP
+                    last_bonus TIMESTAMP,
+                    stars INTEGER DEFAULT 0
                 )''')
-    
+
     # Транзакции
     c.execute('''CREATE TABLE IF NOT EXISTS transactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT,
                     amount INTEGER,
                     reason TEXT,
                     timestamp TIMESTAMP
                 )''')
-    
+
     # Чеки
     c.execute('''CREATE TABLE IF NOT EXISTS checks (
                     code TEXT PRIMARY KEY,
                     amount INTEGER,
-                    created_by INTEGER,
+                    created_by BIGINT,
                     created_at TIMESTAMP,
-                    claimed_by INTEGER
+                    claimed_by BIGINT
                 )''')
-    
+
     # Промокоды
     c.execute('''CREATE TABLE IF NOT EXISTS promocodes (
                     code TEXT PRIMARY KEY,
@@ -47,30 +58,30 @@ def init_db():
                 )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS promo_uses (
-                    user_id INTEGER,
+                    user_id BIGINT,
                     code TEXT,
                     PRIMARY KEY (user_id, code)
                 )''')
-    
+
     # Настройки групп
     c.execute('''CREATE TABLE IF NOT EXISTS groups (
-                    group_id INTEGER PRIMARY KEY,
+                    group_id BIGINT PRIMARY KEY,
                     games_enabled INTEGER DEFAULT 1
                 )''')
-    
+
     # Казна групп
     c.execute('''CREATE TABLE IF NOT EXISTS group_treasury (
-                    group_id INTEGER PRIMARY KEY,
+                    group_id BIGINT PRIMARY KEY,
                     balance INTEGER DEFAULT 0,
                     reward INTEGER DEFAULT 0
                 )''')
-    
+
     # Приглашения
     c.execute('''CREATE TABLE IF NOT EXISTS invites (
-                    user_id INTEGER PRIMARY KEY,
-                    invited_by INTEGER
-               )''')
-    
+                    user_id BIGINT PRIMARY KEY,
+                    invited_by BIGINT
+                )''')
+
     conn.commit()
     conn.close()
 
@@ -79,84 +90,111 @@ def init_db():
 # Пользователи
 # -------------------------
 def get_user(user_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT user_id, username, balance, last_bonus FROM users WHERE user_id=?", (user_id,))
+    c.execute("SELECT user_id, username, balance, last_bonus FROM users WHERE user_id=%s", (user_id,))
     row = c.fetchone()
     conn.close()
     return row
 
+
 def create_user(user_id, username):
     if get_user(user_id):
         return False
-    conn = sqlite3.connect(DB_PATH)
+
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("INSERT INTO users (user_id, username, balance, last_bonus) VALUES (?, ?, ?, ?)",
-              (user_id, username, 0, None))
+    c.execute(
+        "INSERT INTO users (user_id, username, balance, last_bonus) VALUES (%s, %s, %s, %s)",
+        (user_id, username, 0, None)
+    )
     conn.commit()
     conn.close()
     return True
 
+
 def update_balance(user_id, delta, reason):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("UPDATE users SET balance = balance + ? WHERE user_id=?", (delta, user_id))
-    c.execute("INSERT INTO transactions (user_id, amount, reason, timestamp) VALUES (?, ?, ?, ?)",
-              (user_id, delta, reason, datetime.datetime.now().isoformat()))
+
+    c.execute("UPDATE users SET balance = balance + %s WHERE user_id=%s", (delta, user_id))
+    c.execute(
+        "INSERT INTO transactions (user_id, amount, reason, timestamp) VALUES (%s, %s, %s, %s)",
+        (user_id, delta, reason, datetime.datetime.now())
+    )
+
     conn.commit()
     conn.close()
+
     user = get_user(user_id)
     return user[2] if user else None
+
 
 def get_balance(user_id):
     user = get_user(user_id)
     return user[2] if user else 0
 
+
 def set_last_bonus(user_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    c.execute("UPDATE users SET last_bonus=? WHERE user_id=?", (now, user_id))
+    now = datetime.datetime.now()
+    c.execute("UPDATE users SET last_bonus=%s WHERE user_id=%s", (now, user_id))
     conn.commit()
     conn.close()
 
+
 def get_last_bonus(user_id):
     user = get_user(user_id)
-    if user and user[3]:
-        return datetime.datetime.fromisoformat(user[3])
-    return None
+    return user[3] if user and user[3] else None
 
 
 # -------------------------
 # Казна групп
 # -------------------------
 def get_group_treasury(group_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT balance, reward FROM group_treasury WHERE group_id=?", (group_id,))
+
+    c.execute("SELECT balance, reward FROM group_treasury WHERE group_id=%s", (group_id,))
     row = c.fetchone()
+
     if not row:
-        c.execute("INSERT INTO group_treasury (group_id, balance, reward) VALUES (?, ?, ?)", (group_id, 0, 0))
+        c.execute(
+            "INSERT INTO group_treasury (group_id, balance, reward) VALUES (%s, %s, %s)",
+            (group_id, 0, 0)
+        )
         conn.commit()
         row = (0, 0)
+
     conn.close()
     return {"balance": row[0], "reward": row[1]}
 
+
 def update_group_treasury(group_id, delta_balance=0, delta_reward=None):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
+
     if delta_reward is not None:
-        c.execute("UPDATE group_treasury SET reward=? WHERE group_id=?", (delta_reward, group_id))
+        c.execute("UPDATE group_treasury SET reward=%s WHERE group_id=%s", (delta_reward, group_id))
+
     if delta_balance != 0:
-        c.execute("UPDATE group_treasury SET balance = balance + ? WHERE group_id=?", (delta_balance, group_id))
+        c.execute(
+            "UPDATE group_treasury SET balance = balance + %s WHERE group_id=%s",
+            (delta_balance, group_id)
+        )
+
     conn.commit()
     conn.close()
+
 
 def set_reward(group_id, reward):
     update_group_treasury(group_id, delta_reward=reward)
 
+
 def add_to_treasury(group_id, amount):
     update_group_treasury(group_id, delta_balance=amount)
+
 
 def subtract_from_treasury(group_id, amount):
     update_group_treasury(group_id, delta_balance=-amount)
@@ -168,35 +206,48 @@ def subtract_from_treasury(group_id, amount):
 def generate_check_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
+
 def create_check(user_id, amount):
     code = generate_check_code()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    c.execute("INSERT INTO checks (code, amount, created_by, created_at, claimed_by) VALUES (?, ?, ?, ?, ?)",
-              (code, amount, user_id, now, None))
+    now = datetime.datetime.now()
+
+    c.execute(
+        "INSERT INTO checks (code, amount, created_by, created_at, claimed_by) VALUES (%s, %s, %s, %s, %s)",
+        (code, amount, user_id, now, None)
+    )
+
     conn.commit()
     conn.close()
     return code
 
+
 def use_check(code, user_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT amount, created_by, claimed_by FROM checks WHERE code=?", (code,))
+
+    c.execute("SELECT amount, created_by, claimed_by FROM checks WHERE code=%s", (code,))
     row = c.fetchone()
+
     if not row:
         conn.close()
         return None, "Чек не найден"
+
     amount, created_by, claimed_by = row
+
     if claimed_by is not None:
         conn.close()
         return None, "Чек уже использован"
+
     if created_by == user_id:
         conn.close()
         return None, "Нельзя использовать свой чек"
-    c.execute("UPDATE checks SET claimed_by=? WHERE code=?", (user_id, code))
+
+    c.execute("UPDATE checks SET claimed_by=%s WHERE code=%s", (user_id, code))
     conn.commit()
     conn.close()
+
     update_balance(user_id, amount, f"Активация чека {code}")
     return amount, None
 
@@ -205,27 +256,28 @@ def use_check(code, user_id):
 # Промокоды
 # -------------------------
 def create_promo(code: str, reward: int, max_uses: int):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO promocodes (code, reward, max_uses, uses) VALUES (?, ?, ?, 0)",
-        (code.upper(), reward, max_uses)
-    )
-    conn.commit()
-    conn.close()
-    
-def use_promo(code: str, user_id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
 
-    # проверка: юзер уже использовал?
-    c.execute("SELECT 1 FROM promo_uses WHERE user_id=? AND code=?", (user_id, code))
+    c.execute(
+        "INSERT INTO promocodes (code, reward, max_uses, uses) VALUES (%s, %s, %s, 0)",
+        (code.upper(), reward, max_uses)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def use_promo(code: str, user_id: int):
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute("SELECT 1 FROM promo_uses WHERE user_id=%s AND code=%s", (user_id, code))
     if c.fetchone():
         conn.close()
         return None, "❌ Ты уже использовал этот промокод"
 
-    # проверка промика
-    c.execute("SELECT reward, uses, max_uses FROM promocodes WHERE code=?", (code,))
+    c.execute("SELECT reward, uses, max_uses FROM promocodes WHERE code=%s", (code,))
     row = c.fetchone()
 
     if not row:
@@ -238,133 +290,11 @@ def use_promo(code: str, user_id: int):
         conn.close()
         return None, "❌ Промокод закончился"
 
-    # записываем использование
-    c.execute("INSERT INTO promo_uses (user_id, code) VALUES (?, ?)", (user_id, code))
-
-    # увеличиваем счетчик
-    c.execute("UPDATE promocodes SET uses = uses + 1 WHERE code=?", (code,))
+    c.execute("INSERT INTO promo_uses (user_id, code) VALUES (%s, %s)", (user_id, code))
+    c.execute("UPDATE promocodes SET uses = uses + 1 WHERE code=%s", (code,))
 
     conn.commit()
     conn.close()
 
     update_balance(user_id, reward, f"Промокод {code}")
     return reward, None
-
-def get_all_promos():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT code, reward, uses, max_uses FROM promocodes")
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-def delete_promo(code: str):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT code FROM promocodes WHERE code=?", (code.upper(),))
-    if not c.fetchone():
-        conn.close()
-        return False
-    c.execute("DELETE FROM promocodes WHERE code=?", (code.upper(),))
-    conn.commit()
-    conn.close()
-    return True
-
-
-# -------------------------
-# Топ пользователей
-# -------------------------
-def get_top_users(limit=10):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT username, balance FROM users ORDER BY balance DESC LIMIT ?", (limit,))
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-def get_user_history(user_id, limit=10):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT amount, reason, timestamp FROM transactions WHERE user_id=? ORDER BY timestamp DESC LIMIT ?",
-              (user_id, limit))
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-
-# -------------------------
-# Настройки групп
-# -------------------------
-def get_group_settings(group_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT games_enabled FROM groups WHERE group_id=?", (group_id,))
-    row = c.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    return 1
-
-def set_group_settings(group_id, enabled):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO groups (group_id, games_enabled) VALUES (?, ?)", (group_id, enabled))
-    conn.commit()
-    conn.close()
-
-
-# -------------------------
-# Приглашения
-# -------------------------
-def add_invite(user_id, inviter_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT user_id FROM invites WHERE user_id=?", (user_id,))
-    if c.fetchone():
-        conn.close()
-        return False
-    c.execute("INSERT INTO invites (user_id, invited_by) VALUES (?, ?)", (user_id, inviter_id))
-    conn.commit()
-    conn.close()
-    return True
-
-    c.execute("SELECT user_id FROM invites WHERE user_id=?", (user_id,))
-    if c.fetchone():
-        conn.close()
-        return False
-
-    c.execute("INSERT INTO invites (user_id, invited_by) VALUES (?, ?)", (user_id, inviter_id))
-    conn.commit()
-    conn.close()
-    return True
-
-# Добавить пользователю GALL за донат
-def add_donation(user_id: int, stars: int):
-    plan = DONATION_PLANS.get(stars)
-    if not plan:
-        return False, "❌ Неверное количество звезд"
-    gall = plan['gall']
-    bonus = plan.get('bonus', 0)
-    total = gall + int(gall * bonus / 100)
-    update_balance(user_id, total, f"Покупка за {stars} Stars")
-    return True, total
-
-def get_user_stars(user_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT stars FROM users WHERE user_id=?", (user_id,))
-    row = c.fetchone()
-    conn.close()
-    return row[0] if row else 0
-
-def update_user_stars(user_id, amount, reason=""):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE users SET stars = stars + ? WHERE user_id=?", (amount, user_id))
-    # Добавим лог
-    c.execute(
-        "INSERT INTO transactions (user_id, amount, reason, timestamp) VALUES (?, ?, ?, ?)",
-        (user_id, amount, reason, datetime.datetime.now())
-    )
-    conn.commit()
-    conn.close()
