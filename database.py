@@ -96,6 +96,19 @@ def get_user(user_id):
     conn.close()
     return row
 
+def get_top_users(limit=10):
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT username, balance 
+        FROM users 
+        ORDER BY balance DESC 
+        LIMIT %s
+    """, (limit,))
+    result = cur.fetchall()
+    cur.close()
+    conn.close()
+    return result
 
 def create_user(user_id, username):
     if get_user(user_id):
