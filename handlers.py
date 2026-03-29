@@ -358,17 +358,20 @@ async def history_text(message: Message):
 # /top
 @router.message(lambda message: message.text and message.text.lower() == "топ")
 async def top_text(message: Message):
-    top_users = db.get_top_users(10)
+    # Получаем топ 10 пользователей по балансу
+    top_users = db.get_top_users(10)  # убедись, что эта функция возвращает список кортежей (username, balance)
 
     if not top_users:
-        await message.answer("Нет пользователей в рейтинге.")
+        await message.answer("❌ Нет пользователей в рейтинге.")
         return
 
     text = "🏆 Топ-10 игроков по балансу:\n\n"
 
-    for i, (username, balance) in enumerate(top_users, 1):
-        name = username if username else "Аноним"
-        text += f"{i}. {name} — {balance} GALL\n"
+    for i, user in enumerate(top_users, 1):
+        # user должен быть кортежем (username, balance)
+        username = user[0] if user[0] else "Аноним"
+        balance = user[1]
+        text += f"{i}. {username} — {balance} GALL\n"
 
     await message.answer(text)
     
