@@ -748,28 +748,21 @@ async def darts_modes(message: Message):
     else:
         result = "❌ МИМО"
 
-    # 🎯 ОБЫЧНЫЙ РЕЖИМ (НОВАЯ ЛОГИКА)
+    # 🎯 ОБЩАЯ ЛОГИКА ВЫИГРЫША
     if mode == "обычный":
         if value == 6:
             win = bet * 3
-        elif value >= 4:
+        elif value >= 4:  # 4 и 5
             win = bet * 2
-        # value == 3 теперь поражение, win = 0
-
-    # 🎯 СТАРЫЕ РЕЖИМЫ (ПОДОГНАНЫ ПОД НОВУЮ ЛОГИКУ)
+        # value == 3 всегда поражение, win = 0
     elif mode == "центр" and value == 6:
         win = bet * 3
-
     elif mode == "мимо" and value <= 2:
         win = bet * 2
-
     elif mode == "кр" and value >= 4:
         win = bet * 2
-
-    elif mode == "бел":
-        # теперь value == 3 поражение
-        if value != 3:
-            win = bet * 2
+    elif mode == "бел" and value != 3:  # value == 3 поражение
+        win = bet * 2
 
     if win:
         db.update_balance(user_id, win, "Дартс выигрыш")
