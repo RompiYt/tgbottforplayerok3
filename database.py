@@ -4,13 +4,12 @@ import random
 import string
 
 DB_CONFIG = {
-    "dbname": "your_db",
-    "user": "your_user",
-    "password": "your_password",
-    "host": "localhost",
-    "port": "5432"
+    "dbname": "bothost_db_ba81305b6da8",
+    "user": "bothost_db_ba81305b6da8",
+    "password": "oVNaiu_2B2IYMXotiuveax264qu6WPcfkcOii2ntTUg",
+    "host": "node1.pghost.ru",
+    "port": "32857"
 }
-
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
