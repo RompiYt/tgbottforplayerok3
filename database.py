@@ -8,7 +8,7 @@ DB_CONFIG = {
     "user": "bothost_db_ba81305b6da8",
     "password": "oVNaiu_2B2IYMXotiuveax264qu6WPcfkcOii2ntTUg",
     "host": "node1.pghost.ru",
-    "port": "32857"
+    "port": "15510"
 }
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
